@@ -1,0 +1,4 @@
+Add threading.
+Background tasks should not make the GUI slugging or unresponsive.
+Files should be playable once they are added to the app's library.
+Information about the files should be visible and editable in the GUI.
