@@ -448,6 +448,31 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Get application settings
+    /// </summary>
+    public AppSettings GetSettings()
+    {
+        return _settings;
+    }
+
+    /// <summary>
+    /// Reload settings after changes
+    /// </summary>
+    public void ReloadSettings()
+    {
+        _logger.LogInfo("Reloading settings after changes");
+        
+        // Settings object is updated directly, no need to reload
+        // But we can update logging level if changed
+        if (Enum.TryParse<LogLevel>(_settings.LogLevel, out var logLevel))
+        {
+            _logger.SetMinimumLevel(logLevel);
+        }
+        
+        _logger.LogInfo("Settings reloaded successfully");
+    }
+
+    /// <summary>
     /// Raise property changed event
     /// </summary>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
