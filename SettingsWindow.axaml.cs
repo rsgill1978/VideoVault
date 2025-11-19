@@ -14,6 +14,16 @@ public partial class SettingsWindow : Window
     private readonly SettingsWindowViewModel _viewModel;
     private readonly LoggingService _logger;
 
+    /// <summary>
+    /// Initialize settings window
+    /// </summary>
+    public SettingsWindow() : this(new AppSettings())
+    {
+    }
+
+    /// <summary>
+    /// Initialize settings window with existing settings
+    /// </summary>
     public SettingsWindow(AppSettings settings)
     {
         InitializeComponent();
