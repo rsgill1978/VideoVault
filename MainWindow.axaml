@@ -94,20 +94,28 @@
                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <DataGrid ItemsSource="{Binding Videos}" 
-                             SelectedItem="{Binding SelectedVideo}"
-                             AutoGenerateColumns="False" IsReadOnly="True"
-                             GridLinesVisibility="Horizontal"
-                             ToolTip.Tip="List of video files in the catalog"
-                             x:CompileBindings="False">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="*"/>
-                            <DataGridTextColumn Header="Size" Binding="{Binding FileSize, StringFormat='{}{0:N0} bytes'}" Width="120"/>
-                            <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="80"/>
-                            <DataGridTextColumn Header="Date Added" Binding="{Binding DateAdded, StringFormat='{}{0:yyyy-MM-dd}'}" Width="100"/>
-                            <DataGridCheckBoxColumn Header="Duplicate" Binding="{Binding IsDuplicate}" Width="80"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <!-- Use ListBox as primary view with better compatibility -->
+                    <ListBox ItemsSource="{Binding Videos}"
+                            SelectedItem="{Binding SelectedVideo}"
+                            Background="White"
+                            ToolTip.Tip="List of video files in the catalog">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5">
+                                    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding FileName}" 
+                                                  FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding FileSize, StringFormat='{}{0:N0} bytes'}" 
+                                                  Margin="10,0,0,0" Foreground="Gray"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Extension}" 
+                                                  Margin="10,0,0,0" Foreground="Gray"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding DateAdded, StringFormat='{}{0:yyyy-MM-dd}'}" 
+                                                  Margin="10,0,0,0" Foreground="Gray"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </DockPanel>
             </Border>
 
