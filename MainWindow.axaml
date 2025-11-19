@@ -86,15 +86,15 @@
             <!-- Video List -->
             <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" 
                    CornerRadius="5" Padding="5" Margin="0,0,5,0">
-                <Grid RowDefinitions="Auto,*">
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
                         <TextBlock Text="Video Library" FontWeight="Bold" FontSize="16"/>
                         <TextBlock Text="{Binding Videos.Count, StringFormat='({0} videos)'}" 
                                   FontWeight="Normal" FontSize="14" Foreground="Gray"
                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <DataGrid Grid.Row="1" ItemsSource="{Binding Videos}" 
+                    <DataGrid ItemsSource="{Binding Videos}" 
                              SelectedItem="{Binding SelectedVideo}"
                              AutoGenerateColumns="False" IsReadOnly="True"
                              GridLinesVisibility="Horizontal"
@@ -108,26 +108,26 @@
                             <DataGridCheckBoxColumn Header="Duplicate" Binding="{Binding IsDuplicate}" Width="80"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                </Grid>
+                </DockPanel>
             </Border>
 
             <!-- Duplicate Groups -->
             <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" 
                    CornerRadius="5" Padding="5">
-                <Grid RowDefinitions="Auto,Auto,*">
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
                         <TextBlock Text="Duplicate Groups" FontWeight="Bold" FontSize="16"/>
                         <TextBlock Text="{Binding DuplicateGroups.Count, StringFormat='({0} groups)'}" 
                                   FontWeight="Normal" FontSize="14" Foreground="Gray"
                                   VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <Button Grid.Row="1" Content="Find Duplicates" Click="FindDuplicatesButton_Click"
+                    <Button DockPanel.Dock="Top" Content="Find Duplicates" Click="FindDuplicatesButton_Click"
                            Width="150" HorizontalAlignment="Left" Margin="0,0,0,10"
                            IsEnabled="{Binding CanFindDuplicates}"
                            ToolTip.Tip="Search for duplicate video files based on file hash"/>
                     
-                    <ListBox Grid.Row="2" ItemsSource="{Binding DuplicateGroups}"
+                    <ListBox ItemsSource="{Binding DuplicateGroups}"
                             ToolTip.Tip="Groups of duplicate video files">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
@@ -150,7 +150,7 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </Grid>
+                </DockPanel>
             </Border>
         </Grid>
 
