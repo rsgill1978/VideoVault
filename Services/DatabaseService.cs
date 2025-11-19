@@ -112,7 +112,11 @@ public class DatabaseService
 
         // Execute query and get the new ID
         var result = await command.ExecuteScalarAsync();
-        return Convert.ToInt32(result);
+        int newId = Convert.ToInt32(result);
+        
+        _logger.LogDebug($"Added video to database: ID={newId}, File={video.FileName}");
+        
+        return newId;
     }
 
     /// <summary>
@@ -136,6 +140,8 @@ public class DatabaseService
         {
             videos.Add(MapReaderToVideoFile(reader));
         }
+
+        _logger.LogDebug($"Retrieved {videos.Count} videos from database");
 
         return videos;
     }

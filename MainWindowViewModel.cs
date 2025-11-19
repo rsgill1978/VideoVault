@@ -285,6 +285,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
             _logger.LogInfo($"Scan complete: {added} added, {skipped} skipped");
             ScanStatus = $"Scan complete. Added {added} new video files.";
+            
+            // Reload videos from database to update UI
+            await LoadVideosAsync();
         }
         catch (OperationCanceledException)
         {
@@ -396,13 +399,16 @@ public class MainWindowViewModel : INotifyPropertyChanged
             _logger.LogInfo("Loading videos from database...");
             var videos = await _databaseService.GetAllVideosAsync();
 
+            _logger.LogDebug($"Retrieved {videos.Count} videos from database");
+            
             Videos.Clear();
             foreach (var video in videos)
             {
                 Videos.Add(video);
+                _logger.LogDebug($"Added to UI: {video.FileName}");
             }
 
-            _logger.LogInfo($"Loaded {videos.Count} videos from database");
+            _logger.LogInfo($"Loaded {videos.Count} videos from database - UI updated with {Videos.Count} items");
         }
         catch (Exception ex)
         {
