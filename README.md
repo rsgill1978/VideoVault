@@ -9,13 +9,16 @@ VideoVault is a cross-platform desktop application for cataloging and organizing
 This is Phase 1 of the VideoVault project, which includes:
 
 - **Project Scaffolding**: Complete cross-platform C# application structure
+- **Logging System**: Comprehensive file-based logging with configurable levels
+- **Settings UI**: Full settings configuration interface
 - **File Browser**: Browse and select video directories
 - **Recursive Scanning**: Scan directories recursively for video files
 - **Database Catalog**: Automatic SQLite database creation and management
 - **Progress Tracking**: Visual progress bars for all background operations
 - **Duplicate Detection**: Find duplicate files using SHA256 hash comparison
 - **Multi-threaded**: Non-blocking UI with background task processing
-- **Settings Persistence**: JSON-based settings storage
+- **Settings Persistence**: JSON-based settings storage with UI editor
+- **Menu System**: Comprehensive menu bar with File, Tools, and Help menus
 
 ## System Requirements
 
@@ -93,6 +96,18 @@ chmod +x bin/Release/osx-x64/VideoVault
 3. Duplicate groups will appear in the right panel
 4. Each group shows files with identical content (based on SHA256 hash)
 
+### Configuring Settings
+
+1. Click the "Settings" button or go to File > Settings
+2. Adjust settings as needed:
+   - **Window Size**: Set default window dimensions
+   - **Video Extensions**: Customize supported video formats
+   - **Duplicate Threshold**: Adjust duplicate detection sensitivity
+   - **Logging Level**: Control log verbosity (Debug, Info, Warning, Error, Critical)
+   - **Log Retention**: Set how many days to keep old logs
+3. Click "Save" to apply changes
+4. Click "Restore Defaults" to reset all settings
+
 ### Supported Video Formats
 
 - MP4 (.mp4)
@@ -132,6 +147,58 @@ chmod +x bin/Release/osx-x64/VideoVault
 - Location: `~/.config/VideoVault/settings.json` (Linux/macOS)
 - Format: JSON
 - Contains: User preferences, window size, last used paths
+
+### Log Files
+- Location: `%AppData%/VideoVault/Logs/` (Windows)
+- Location: `~/.config/VideoVault/Logs/` (Linux/macOS)
+- Format: Text files with timestamps
+- Naming: `VideoVault_YYYY-MM-DD_HH-mm-ss.log`
+- Retention: Configurable (default 30 days)
+
+## Logging System
+
+The application includes a comprehensive logging system with configurable levels:
+
+### Log Levels
+- **Debug**: Detailed debugging information (property changes, detailed operations)
+- **Info**: General informational messages (default level)
+- **Warning**: Warning messages for potential issues
+- **Error**: Error messages for failures
+- **Critical**: Critical errors that may cause application failure
+
+### Configuring Logging
+
+Edit the `settings.json` file to configure logging:
+
+```json
+{
+  "LogLevel": "Info",
+  "LogRetentionDays": 30
+}
+```
+
+Available log levels: `Debug`, `Info`, `Warning`, `Error`, `Critical`
+
+### Viewing Logs
+
+Log files are automatically created each time the application starts. To view logs:
+
+**Windows:**
+```
+%AppData%\VideoVault\Logs\
+```
+
+**Linux/macOS:**
+```
+~/.config/VideoVault/Logs/
+```
+
+Logs include:
+- Application startup and shutdown
+- File scanning operations
+- Database operations
+- Error messages with stack traces
+- Performance information
 
 ## Technical Details
 

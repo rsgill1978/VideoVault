@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using VideoVault.Models;
 
@@ -9,9 +13,12 @@ namespace VideoVault.Services;
 public class DatabaseService
 {
     private readonly string _connectionString;
+    private readonly LoggingService _logger;
 
     public DatabaseService()
     {
+        _logger = LoggingService.Instance;
+
         // Get application data directory
         string appDataPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -22,11 +29,13 @@ public class DatabaseService
         if (!Directory.Exists(appDataPath))
         {
             Directory.CreateDirectory(appDataPath);
+            _logger.LogInfo($"Created application data directory: {appDataPath}");
         }
 
         // Set database file path
         string dbPath = Path.Combine(appDataPath, "videovault.db");
         _connectionString = $"Data Source={dbPath}";
+        _logger.LogInfo($"Database path: {dbPath}");
 
         // Initialize database tables
         InitializeDatabase();
@@ -37,32 +46,42 @@ public class DatabaseService
     /// </summary>
     private void InitializeDatabase()
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            connection.Open();
 
-        // Create VideoFiles table
-        string createTableQuery = @"
-            CREATE TABLE IF NOT EXISTS VideoFiles (
-                Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                FilePath TEXT NOT NULL UNIQUE,
-                FileName TEXT NOT NULL,
-                FileSize INTEGER NOT NULL,
-                FileHash TEXT NOT NULL,
-                DateAdded TEXT NOT NULL,
-                Duration REAL DEFAULT 0,
-                Resolution TEXT DEFAULT '',
-                Extension TEXT NOT NULL,
-                IsDuplicate INTEGER DEFAULT 0,
-                OriginalFileId INTEGER NULL
-            )";
+            // Create VideoFiles table
+            string createTableQuery = @"
+                CREATE TABLE IF NOT EXISTS VideoFiles (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    FilePath TEXT NOT NULL UNIQUE,
+                    FileName TEXT NOT NULL,
+                    FileSize INTEGER NOT NULL,
+                    FileHash TEXT NOT NULL,
+                    DateAdded TEXT NOT NULL,
+                    Duration REAL DEFAULT 0,
+                    Resolution TEXT DEFAULT '',
+                    Extension TEXT NOT NULL,
+                    IsDuplicate INTEGER DEFAULT 0,
+                    OriginalFileId INTEGER NULL
+                )";
 
-        using var command = new SqliteCommand(createTableQuery, connection);
-        command.ExecuteNonQuery();
+            using var command = new SqliteCommand(createTableQuery, connection);
+            command.ExecuteNonQuery();
 
-        // Create index on FileHash for faster duplicate detection
-        string createIndexQuery = "CREATE INDEX IF NOT EXISTS idx_filehash ON VideoFiles(FileHash)";
-        using var indexCommand = new SqliteCommand(createIndexQuery, connection);
-        indexCommand.ExecuteNonQuery();
+            // Create index on FileHash for faster duplicate detection
+            string createIndexQuery = "CREATE INDEX IF NOT EXISTS idx_filehash ON VideoFiles(FileHash)";
+            using var indexCommand = new SqliteCommand(createIndexQuery, connection);
+            indexCommand.ExecuteNonQuery();
+
+            _logger.LogInfo("Database initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to initialize database", ex);
+            throw;
+        }
     }
 
     /// <summary>
