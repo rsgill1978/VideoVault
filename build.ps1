@@ -63,7 +63,8 @@ function Build-ForRuntime {
         }
     }
     catch {
-        Write-Host "Error building for $PlatformName: $_" -ForegroundColor Red
+        $errorMessage = $_.Exception.Message
+        Write-Host "Error building for ${PlatformName}: $errorMessage" -ForegroundColor Red
         exit 1
     }
     
