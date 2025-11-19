@@ -38,6 +38,16 @@ public class AppSettings
     /// </summary>
     public int DuplicateThreshold { get; set; } = 95;
 
+    /// <summary>
+    /// Logging level for application logs
+    /// </summary>
+    public string LogLevel { get; set; } = "Info";
+
+    /// <summary>
+    /// Number of days to keep log files
+    /// </summary>
+    public int LogRetentionDays { get; set; } = 30;
+
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "VideoVault",

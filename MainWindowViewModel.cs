@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using VideoVault.Models;
 using VideoVault.Services;
+using static VideoVault.Services.LogLevel;
 
 namespace VideoVault;
 
@@ -20,6 +21,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly FileScannerService _fileScannerService;
     private readonly DuplicateFinderService _duplicateFinderService;
     private readonly AppSettings _settings;
+    private readonly LoggingService _logger;
     private CancellationTokenSource? _cancellationTokenSource;
 
     private string _videoPath = string.Empty;
@@ -32,11 +34,31 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public MainWindowViewModel()
     {
+        // Initialize logging service
+        _logger = LoggingService.Instance;
+        _logger.LogInfo("=== VideoVault Application Starting ===");
+
         // Initialize services
         _settings = AppSettings.Load();
+        _logger.LogInfo($"Settings loaded from configuration");
+
+        // Set logging level from settings
+        if (Enum.TryParse<LogLevel>(_settings.LogLevel, out var logLevel))
+        {
+            _logger.SetMinimumLevel(logLevel);
+        }
+
+        // Clean old log files
+        _logger.CleanOldLogs(_settings.LogRetentionDays);
+
         _databaseService = new DatabaseService();
+        _logger.LogInfo("Database service initialized");
+
         _fileScannerService = new FileScannerService(_settings);
+        _logger.LogInfo("File scanner service initialized");
+
         _duplicateFinderService = new DuplicateFinderService(_databaseService);
+        _logger.LogInfo("Duplicate finder service initialized");
 
         // Subscribe to scanner events
         _fileScannerService.ProgressChanged += OnScanProgressChanged;
@@ -48,6 +70,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
         // Set initial video path from settings
         VideoPath = _settings.LastVideoPath;
+        _logger.LogInfo($"Initial video path: {VideoPath}");
 
         // Load existing videos from database
         _ = LoadVideosAsync();
@@ -76,7 +99,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
             if (_videoPath != value)
             {
                 _videoPath = value;
+                _logger.LogDebug($"VideoPath changed to: {value}");
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(CanScan));
             }
         }
     }
@@ -200,7 +225,14 @@ public class MainWindowViewModel : INotifyPropertyChanged
     /// </summary>
     public async Task StartScanAsync()
     {
-        if (!CanScan) return;
+        if (!CanScan)
+        {
+            _logger.LogWarning("Scan attempted but conditions not met");
+            return;
+        }
+
+        _logger.LogInfo("=== Starting video scan ===");
+        _logger.LogInfo($"Scan path: {VideoPath}");
 
         IsScanning = true;
         ScanStatus = "Scanning for video files...";
@@ -215,19 +247,25 @@ public class MainWindowViewModel : INotifyPropertyChanged
             // Save video path to settings
             _settings.LastVideoPath = VideoPath;
             _settings.Save();
+            _logger.LogDebug("Video path saved to settings");
 
             // Scan directory for video files
+            _logger.LogInfo("Beginning directory scan...");
             var filePaths = await _fileScannerService.ScanDirectoryAsync(VideoPath, _cancellationTokenSource.Token);
+            _logger.LogInfo($"Found {filePaths.Count} video files");
 
             ScanStatus = $"Found {filePaths.Count} video files. Processing...";
             ScanTotal = filePaths.Count;
 
             // Process video files
+            _logger.LogInfo("Processing video files...");
             var videoFiles = await _fileScannerService.ProcessFilesAsync(filePaths, _cancellationTokenSource.Token);
 
             // Add to database
             ScanStatus = "Adding to database...";
+            _logger.LogInfo("Adding files to database...");
             int added = 0;
+            int skipped = 0;
 
             foreach (var video in videoFiles)
             {
@@ -236,17 +274,26 @@ public class MainWindowViewModel : INotifyPropertyChanged
                 {
                     await _databaseService.AddVideoFileAsync(video);
                     added++;
+                    _logger.LogDebug($"Added: {video.FileName}");
+                }
+                else
+                {
+                    skipped++;
+                    _logger.LogDebug($"Skipped (duplicate): {video.FileName}");
                 }
             }
 
+            _logger.LogInfo($"Scan complete: {added} added, {skipped} skipped");
             ScanStatus = $"Scan complete. Added {added} new video files.";
         }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning("Scan cancelled by user");
             ScanStatus = "Scan cancelled.";
         }
         catch (Exception ex)
         {
+            _logger.LogError("Scan failed", ex);
             ScanStatus = $"Error: {ex.Message}";
         }
         finally
@@ -254,6 +301,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             IsScanning = false;
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
+            _logger.LogInfo("=== Scan operation completed ===");
         }
     }
 
@@ -270,7 +318,13 @@ public class MainWindowViewModel : INotifyPropertyChanged
     /// </summary>
     public async Task FindDuplicatesAsync()
     {
-        if (!CanFindDuplicates) return;
+        if (!CanFindDuplicates)
+        {
+            _logger.LogWarning("Find duplicates attempted but conditions not met");
+            return;
+        }
+
+        _logger.LogInfo("=== Starting duplicate detection ===");
 
         IsFindingDuplicates = true;
         ScanStatus = "Finding duplicates...";
@@ -284,16 +338,20 @@ public class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             // Find duplicates
+            _logger.LogInfo("Analyzing files for duplicates...");
             var duplicates = await _duplicateFinderService.FindDuplicatesAsync(_cancellationTokenSource.Token);
+            _logger.LogInfo($"Found {duplicates.Count} duplicate groups");
 
             ScanStatus = $"Found {duplicates.Count} duplicate groups.";
         }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning("Duplicate search cancelled by user");
             ScanStatus = "Duplicate search cancelled.";
         }
         catch (Exception ex)
         {
+            _logger.LogError("Duplicate search failed", ex);
             ScanStatus = $"Error: {ex.Message}";
         }
         finally
@@ -301,6 +359,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             IsFindingDuplicates = false;
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
+            _logger.LogInfo("=== Duplicate detection completed ===");
         }
     }
 
@@ -334,6 +393,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     {
         try
         {
+            _logger.LogInfo("Loading videos from database...");
             var videos = await _databaseService.GetAllVideosAsync();
 
             Videos.Clear();
@@ -341,9 +401,12 @@ public class MainWindowViewModel : INotifyPropertyChanged
             {
                 Videos.Add(video);
             }
+
+            _logger.LogInfo($"Loaded {videos.Count} videos from database");
         }
         catch (Exception ex)
         {
+            _logger.LogError("Failed to load videos from database", ex);
             Console.WriteLine($"Error loading videos: {ex.Message}");
         }
     }

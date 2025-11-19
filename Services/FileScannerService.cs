@@ -14,10 +14,12 @@ namespace VideoVault.Services;
 public class FileScannerService
 {
     private readonly AppSettings _settings;
+    private readonly LoggingService _logger;
 
     public FileScannerService(AppSettings settings)
     {
         _settings = settings;
+        _logger = LoggingService.Instance;
     }
 
     /// <summary>
@@ -39,15 +41,25 @@ public class FileScannerService
 
         try
         {
+            _logger.LogInfo($"Starting recursive directory scan: {path}");
+
             // Get all files recursively
             await Task.Run(() =>
             {
                 ScanDirectoryRecursive(path, videoFiles, cancellationToken);
             }, cancellationToken);
+
+            _logger.LogInfo($"Directory scan complete. Found {videoFiles.Count} video files");
         }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning("Directory scan cancelled");
             // Scan was cancelled
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error scanning directory: {path}", ex);
             throw;
         }
 

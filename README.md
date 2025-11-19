@@ -133,6 +133,58 @@ chmod +x bin/Release/osx-x64/VideoVault
 - Format: JSON
 - Contains: User preferences, window size, last used paths
 
+### Log Files
+- Location: `%AppData%/VideoVault/Logs/` (Windows)
+- Location: `~/.config/VideoVault/Logs/` (Linux/macOS)
+- Format: Text files with timestamps
+- Naming: `VideoVault_YYYY-MM-DD_HH-mm-ss.log`
+- Retention: Configurable (default 30 days)
+
+## Logging System
+
+The application includes a comprehensive logging system with configurable levels:
+
+### Log Levels
+- **Debug**: Detailed debugging information (property changes, detailed operations)
+- **Info**: General informational messages (default level)
+- **Warning**: Warning messages for potential issues
+- **Error**: Error messages for failures
+- **Critical**: Critical errors that may cause application failure
+
+### Configuring Logging
+
+Edit the `settings.json` file to configure logging:
+
+```json
+{
+  "LogLevel": "Info",
+  "LogRetentionDays": 30
+}
+```
+
+Available log levels: `Debug`, `Info`, `Warning`, `Error`, `Critical`
+
+### Viewing Logs
+
+Log files are automatically created each time the application starts. To view logs:
+
+**Windows:**
+```
+%AppData%\VideoVault\Logs\
+```
+
+**Linux/macOS:**
+```
+~/.config/VideoVault/Logs/
+```
+
+Logs include:
+- Application startup and shutdown
+- File scanning operations
+- Database operations
+- Error messages with stack traces
+- Performance information
+
 ## Technical Details
 
 ### Architecture
