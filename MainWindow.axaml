@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VideoVault"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="VideoVault.MainWindow"
         Title="VideoVault - Adult Video Catalog"
@@ -54,7 +55,8 @@
                              SelectedItem="{Binding SelectedVideo}"
                              AutoGenerateColumns="False" IsReadOnly="True"
                              GridLinesVisibility="Horizontal"
-                             ToolTip.Tip="List of video files in the catalog">
+                             ToolTip.Tip="List of video files in the catalog"
+                             x:CompileBindings="False">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="*"/>
                             <DataGridTextColumn Header="Size" Binding="{Binding FileSize, StringFormat='{}{0:N0} bytes'}" Width="120"/>

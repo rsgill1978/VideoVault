@@ -50,7 +50,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
         VideoPath = _settings.LastVideoPath;
 
         // Load existing videos from database
-        LoadVideosAsync();
+        _ = LoadVideosAsync();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
