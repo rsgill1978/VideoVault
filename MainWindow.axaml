@@ -1,0 +1,117 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="VideoVault.MainWindow"
+        Title="VideoVault - Adult Video Catalog"
+        Width="1200" Height="800"
+        MinWidth="800" MinHeight="600">
+
+    <Grid Margin="10" RowDefinitions="Auto,Auto,*,Auto">
+        
+        <!-- Path Selection Row -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+            <TextBlock Text="Video Path:" VerticalAlignment="Center" Width="80"/>
+            <TextBox Text="{Binding VideoPath}" Width="600" VerticalAlignment="Center"
+                     Watermark="Enter or browse to video directory"
+                     ToolTip.Tip="Path to the directory containing video files"/>
+            <Button Content="Browse..." Click="BrowseButton_Click" Width="100"
+                    ToolTip.Tip="Browse for video directory"/>
+            <Button Content="Scan" Click="ScanButton_Click" Width="100"
+                    IsEnabled="{Binding CanScan}"
+                    ToolTip.Tip="Start scanning for video files in the selected directory"/>
+            <Button Content="Cancel" Click="CancelButton_Click" Width="100"
+                    IsEnabled="{Binding CanCancelScan}"
+                    ToolTip.Tip="Cancel the current scan operation"/>
+        </StackPanel>
+
+        <!-- Progress Bar Row -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,Auto" Margin="0,0,0,10">
+            <ProgressBar Grid.Row="0" Minimum="0" Maximum="{Binding ScanTotal}" 
+                        Value="{Binding ScanProgress}" Height="25"
+                        IsIndeterminate="{Binding IsScanning}"
+                        ToolTip.Tip="Scan progress indicator"/>
+            <TextBlock Grid.Row="1" Text="{Binding ScanStatus}" Margin="0,5,0,0"
+                      FontStyle="Italic" Foreground="Gray"/>
+        </Grid>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="2" ColumnDefinitions="2*,*">
+            
+            <!-- Video List -->
+            <Border Grid.Column="0" BorderBrush="Gray" BorderThickness="1" 
+                   CornerRadius="5" Padding="5" Margin="0,0,5,0">
+                <Grid RowDefinitions="Auto,*">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                        <TextBlock Text="Video Library" FontWeight="Bold" FontSize="16"/>
+                        <TextBlock Text="{Binding Videos.Count, StringFormat='({0} videos)'}" 
+                                  FontWeight="Normal" FontSize="14" Foreground="Gray"
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Videos}" 
+                             SelectedItem="{Binding SelectedVideo}"
+                             AutoGenerateColumns="False" IsReadOnly="True"
+                             GridLinesVisibility="Horizontal"
+                             ToolTip.Tip="List of video files in the catalog">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="*"/>
+                            <DataGridTextColumn Header="Size" Binding="{Binding FileSize, StringFormat='{}{0:N0} bytes'}" Width="120"/>
+                            <DataGridTextColumn Header="Extension" Binding="{Binding Extension}" Width="80"/>
+                            <DataGridTextColumn Header="Date Added" Binding="{Binding DateAdded, StringFormat='{}{0:yyyy-MM-dd}'}" Width="100"/>
+                            <DataGridCheckBoxColumn Header="Duplicate" Binding="{Binding IsDuplicate}" Width="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <!-- Duplicate Groups -->
+            <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" 
+                   CornerRadius="5" Padding="5">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                        <TextBlock Text="Duplicate Groups" FontWeight="Bold" FontSize="16"/>
+                        <TextBlock Text="{Binding DuplicateGroups.Count, StringFormat='({0} groups)'}" 
+                                  FontWeight="Normal" FontSize="14" Foreground="Gray"
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <Button Grid.Row="1" Content="Find Duplicates" Click="FindDuplicatesButton_Click"
+                           Width="150" HorizontalAlignment="Left" Margin="0,0,0,10"
+                           IsEnabled="{Binding CanFindDuplicates}"
+                           ToolTip.Tip="Search for duplicate video files based on file hash"/>
+                    
+                    <ListBox Grid.Row="2" ItemsSource="{Binding DuplicateGroups}"
+                            ToolTip.Tip="Groups of duplicate video files">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="LightGray" BorderThickness="1" 
+                                       CornerRadius="3" Padding="5" Margin="0,2">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Files.Count, StringFormat='Group: {0} files'}" 
+                                                  FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <ItemsControl ItemsSource="{Binding Files}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding FileName}" 
+                                                              FontSize="11" Margin="10,2,0,2"
+                                                              TextWrapping="Wrap"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="3" Background="#F0F0F0" CornerRadius="3" Padding="5" Margin="0,10,0,0">
+            <TextBlock Text="{Binding ScanStatus}" FontSize="12"/>
+        </Border>
+    </Grid>
+</Window>
