@@ -1,0 +1,126 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
+        x:Class="VideoVault.Views.SettingsWindow"
+        Title="VideoVault - Settings"
+        Width="600" Height="500"
+        MinWidth="500" MinHeight="400"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="20" RowDefinitions="Auto,*,Auto">
+        
+        <!-- Title -->
+        <TextBlock Grid.Row="0" Text="Application Settings" 
+                   FontSize="20" FontWeight="Bold" Margin="0,0,0,20"/>
+
+        <!-- Settings Panel -->
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="15">
+                
+                <!-- General Settings -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="General Settings" FontWeight="Bold" FontSize="16"/>
+                        
+                        <Grid ColumnDefinitions="200,*">
+                            <TextBlock Grid.Column="0" Text="Window Width:" VerticalAlignment="Center"
+                                     ToolTip.Tip="Default window width in pixels"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding WindowWidth}" 
+                                         Minimum="800" Maximum="3840" Increment="10"
+                                         ToolTip.Tip="Set the default window width"/>
+                        </Grid>
+                        
+                        <Grid ColumnDefinitions="200,*">
+                            <TextBlock Grid.Column="0" Text="Window Height:" VerticalAlignment="Center"
+                                     ToolTip.Tip="Default window height in pixels"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding WindowHeight}" 
+                                         Minimum="600" Maximum="2160" Increment="10"
+                                         ToolTip.Tip="Set the default window height"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Video Settings -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Video Settings" FontWeight="Bold" FontSize="16"/>
+                        
+                        <Grid ColumnDefinitions="200,*">
+                            <TextBlock Grid.Column="0" Text="Video Extensions:" VerticalAlignment="Center"
+                                     ToolTip.Tip="Comma-separated list of video file extensions"/>
+                            <TextBox Grid.Column="1" Text="{Binding VideoExtensions}" 
+                                   Watermark=".mp4,.avi,.mkv"
+                                   ToolTip.Tip="Enter video extensions separated by commas (e.g., .mp4,.avi,.mkv)"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Duplicate Detection Settings -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Duplicate Detection Settings" FontWeight="Bold" FontSize="16"/>
+                        
+                        <Grid ColumnDefinitions="200,*,Auto">
+                            <TextBlock Grid.Column="0" Text="Duplicate Threshold:" VerticalAlignment="Center"
+                                     ToolTip.Tip="Similarity threshold for detecting duplicates (0-100)"/>
+                            <Slider Grid.Column="1" Value="{Binding DuplicateThreshold}" 
+                                  Minimum="0" Maximum="100" 
+                                  TickFrequency="5" IsSnapToTickEnabled="True"
+                                  Margin="0,0,10,0"
+                                  ToolTip.Tip="Adjust the threshold for duplicate detection"/>
+                            <TextBlock Grid.Column="2" Text="{Binding DuplicateThreshold, StringFormat='{}{0}%'}" 
+                                     Width="50" VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Logging Settings -->
+                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="15">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Logging Settings" FontWeight="Bold" FontSize="16"/>
+                        
+                        <Grid ColumnDefinitions="200,*">
+                            <TextBlock Grid.Column="0" Text="Log Level:" VerticalAlignment="Center"
+                                     ToolTip.Tip="Minimum level of log messages to record"/>
+                            <ComboBox Grid.Column="1" SelectedItem="{Binding LogLevel}"
+                                    ToolTip.Tip="Select the minimum logging level">
+                                <ComboBoxItem Content="Debug"/>
+                                <ComboBoxItem Content="Info"/>
+                                <ComboBoxItem Content="Warning"/>
+                                <ComboBoxItem Content="Error"/>
+                                <ComboBoxItem Content="Critical"/>
+                            </ComboBox>
+                        </Grid>
+                        
+                        <Grid ColumnDefinitions="200,*">
+                            <TextBlock Grid.Column="0" Text="Log Retention (Days):" VerticalAlignment="Center"
+                                     ToolTip.Tip="Number of days to keep log files before deletion"/>
+                            <NumericUpDown Grid.Column="1" Value="{Binding LogRetentionDays}" 
+                                         Minimum="1" Maximum="365" Increment="1"
+                                         ToolTip.Tip="Set how many days to keep old log files"/>
+                        </Grid>
+                        
+                        <Button Content="Open Log Folder" Click="OpenLogFolder_Click"
+                              Width="200" HorizontalAlignment="Left"
+                              ToolTip.Tip="Open the folder containing log files"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Action Buttons -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" 
+                   Spacing="10" Margin="0,20,0,0">
+            <Button Content="Restore Defaults" Click="RestoreDefaults_Click" Width="120"
+                    ToolTip.Tip="Reset all settings to default values"/>
+            <Button Content="Cancel" Click="Cancel_Click" Width="100"
+                    ToolTip.Tip="Close without saving changes"/>
+            <Button Content="Save" Click="Save_Click" Width="100"
+                    ToolTip.Tip="Save settings and close"/>
+        </StackPanel>
+
+    </Grid>
+</Window>
