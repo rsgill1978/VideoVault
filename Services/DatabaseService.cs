@@ -79,10 +79,8 @@ public class DatabaseService
         }
         catch (Exception ex)
         {
-            // Log error but don't throw to allow app to start
-            _logger.LogError("Failed to initialize database - database operations will fail", ex);
-            Console.WriteLine($"ERROR: Database initialization failed: {ex.Message}");
-            Console.WriteLine("The application will start but database operations will not work.");
+            _logger.LogError("Failed to initialize database", ex);
+            throw;
         }
     }
 

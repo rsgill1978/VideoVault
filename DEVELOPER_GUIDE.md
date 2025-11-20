@@ -6,68 +6,21 @@
 VideoVault/
 ├── Models/
 │   ├── AppSettings.cs          # JSON settings management
-│   └── VideoFile.cs            # Video file data model with deletion marking
+│   └── VideoFile.cs            # Video file data model
 ├── Services/
 │   ├── DatabaseService.cs      # SQLite database operations
 │   ├── FileScannerService.cs   # Directory scanning and file processing
-│   ├── DuplicateFinderService.cs # Duplicate detection logic
-│   ├── VideoPlayerService.cs   # Video playback service (Phase 2)
-│   └── LoggingService.cs       # Application logging
+│   └── DuplicateFinderService.cs # Duplicate detection logic
 ├── App.axaml                   # Application definition
 ├── App.axaml.cs                # Application code-behind
 ├── MainWindow.axaml            # Main window UI definition
 ├── MainWindow.axaml.cs         # Main window code-behind
 ├── MainWindowViewModel.cs      # Main window view model
-├── VideoPlayerControl.axaml    # Video player UI control (Phase 2)
-├── VideoPlayerControl.axaml.cs # Video player control logic (Phase 2)
-├── SettingsWindow.axaml        # Settings dialog UI
-├── SettingsWindow.axaml.cs     # Settings dialog logic
-├── SettingsWindowViewModel.cs  # Settings view model
 ├── Program.cs                  # Application entry point
 ├── VideoVault.csproj           # Project file
 ├── build.ps1                   # PowerShell build script
 ├── README.md                   # User documentation
-├── QUICK_START.md              # Quick start guide
-├── PHASE2_CHANGES.md           # Phase 2 changes summary
 └── .gitignore                  # Git ignore file
-```
-
-## Phase 2 Architecture
-
-### Video Player Component
-
-```
-┌─────────────────────────────────────┐
-│       MainWindow                    │
-│  ┌──────────────────────────────┐   │
-│  │   VideoPlayerControl         │   │
-│  │  ┌────────────────────────┐  │   │
-│  │  │  VideoPlayerService    │  │   │
-│  │  │  ┌──────────────────┐  │  │   │
-│  │  │  │   LibVLC Core    │  │  │   │
-│  │  │  └──────────────────┘  │  │   │
-│  │  └────────────────────────┘  │   │
-│  └──────────────────────────────┘   │
-└─────────────────────────────────────┘
-```
-
-### Duplicate Deletion Flow
-
-```
-User Action → MainWindow → MainWindowViewModel
-                              ↓
-                    DeleteMarkedDuplicatesAsync
-                              ↓
-                    ┌─────────┴─────────┐
-                    ↓                   ↓
-            DatabaseService      File System
-                 (Delete)          (Delete)
-                    ↓                   ↓
-                    └─────────┬─────────┘
-                              ↓
-                        Reload Videos
-                              ↓
-                         Update UI
 ```
 
 ## Code Standards
@@ -80,12 +33,11 @@ User Action → MainWindow → MainWindowViewModel
 - Focus on WHY code does something, not WHAT it does
 
 ### Naming Conventions
-- Classes: PascalCase (e.g., `VideoPlayerService`)
-- Methods: PascalCase (e.g., `LoadVideo`)
-- Private fields: _camelCase (e.g., `_mediaPlayer`)
-- Properties: PascalCase (e.g., `IsPlaying`)
-- Local variables: camelCase (e.g., `filePath`)
-- Event handlers: PascalCase with suffix (e.g., `OnTimeChanged`)
+- Classes: PascalCase (e.g., `DatabaseService`)
+- Methods: PascalCase (e.g., `GetAllVideosAsync`)
+- Private fields: _camelCase (e.g., `_databaseService`)
+- Properties: PascalCase (e.g., `VideoPath`)
+- Local variables: camelCase (e.g., `videoFiles`)
 
 ### Async/Await
 - All I/O operations are asynchronous
@@ -95,82 +47,85 @@ User Action → MainWindow → MainWindowViewModel
 
 ## Key Components
 
-### VideoPlayerService
+### DatabaseService
 
-Manages video playback using LibVLC:
-- Initializes LibVLC core
-- Creates and manages MediaPlayer
-- Handles playback control
-- Manages volume and position
-- Fires events for UI updates
+Manages all SQLite database operations including:
+- Table creation and initialization
+- CRUD operations for video files
+- Duplicate detection queries
+- Database connection management
 
 Key methods:
-- `Initialize()` - Initialize LibVLC core
-- `Play(string filePath)` - Load and play video
-- `Pause()` / `Resume()` - Control playback
-- `Stop()` - Stop playback
-- `SetPosition(float)` - Seek to position
-- `SetVolume(int)` - Adjust volume
+- `AddVideoFileAsync()` - Add new video to database
+- `GetAllVideosAsync()` - Retrieve all videos
+- `FindDuplicatesByHashAsync()` - Find duplicates by hash
+- `MarkAsDuplicateAsync()` - Mark file as duplicate
+
+### FileScannerService
+
+Handles directory scanning and file processing:
+- Recursive directory traversal
+- Video file filtering by extension
+- SHA256 hash calculation
+- Progress reporting
+
+Key methods:
+- `ScanDirectoryAsync()` - Scan directory recursively
+- `ProcessFilesAsync()` - Process found video files
+- `CalculateFileHashAsync()` - Calculate SHA256 hash
 
 Events:
-- `PositionChanged` - Playback position updated
-- `TimeChanged` - Playback time updated
-- `EndReached` - Video ended
+- `ProgressChanged` - Reports scan progress
+- `FileProcessed` - Notifies when file is processed
 
-### VideoPlayerControl
+### DuplicateFinderService
 
-UI control for video player:
-- Embeds video display
-- Provides playback controls
-- Manages fullscreen mode
-- Updates UI in real-time
+Manages duplicate detection and removal:
+- Hash-based duplicate detection
+- Similarity scoring
+- Duplicate group management
+- File deletion
 
-Key features:
-- Auto-updates every 100ms
-- Thread-safe UI updates
-- Keyboard shortcuts support
-- Fullscreen toggling
+Key methods:
+- `FindDuplicatesAsync()` - Find all duplicates
+- `MarkDuplicatesAsync()` - Mark files as duplicates
+- `DeleteDuplicatesAsync()` - Delete duplicate files
 
-### Duplicate Deletion
+### MainWindowViewModel
 
-Enhanced `VideoFile` model:
-```csharp
-public class VideoFile : INotifyPropertyChanged
-{
-    public bool IsMarkedForDeletion { get; set; }
-    // ... other properties
-}
-```
+MVVM view model providing:
+- Data binding for UI
+- Command execution
+- Property change notifications
+- Background task management
 
-New ViewModel method:
-```csharp
-public async Task DeleteMarkedDuplicatesAsync(
-    DuplicateGroup group, 
-    List<VideoFile> filesToDelete)
-{
-    // Delete from filesystem
-    // Delete from database
-    // Refresh UI
-}
-```
+Key properties:
+- `Videos` - Observable collection of videos
+- `DuplicateGroups` - Observable collection of duplicate groups
+- `ScanProgress` / `ScanTotal` - Progress tracking
+- `IsScanning` / `IsFindingDuplicates` - Operation flags
+
+Key methods:
+- `StartScanAsync()` - Begin directory scan
+- `FindDuplicatesAsync()` - Begin duplicate detection
+- `CancelScan()` - Cancel ongoing operation
 
 ## Threading Model
 
 ### UI Thread
-- All UI updates occur on UI thread
-- Avalonia handles marshalling automatically
-- ObservableCollection auto-marshals
+- All UI updates occur on the UI thread
+- Avalonia handles thread marshalling automatically
+- ObservableCollection automatically marshals to UI thread
 
 ### Background Threads
-- File I/O on background threads
-- Database operations async
-- Video playback on LibVLC threads
-- Hash calculations on background threads
+- File I/O operations run on background threads
+- Database operations run on background threads
+- Hash calculations run on background threads
 
-### Video Player Threads
-- LibVLC manages playback threads
-- Events marshaled to UI thread
-- Timer for UI updates (100ms interval)
+### Cancellation
+- All long-running operations support cancellation
+- `CancellationTokenSource` manages cancellation
+- Operations check for cancellation regularly
 
 ## Database Schema
 
@@ -192,43 +147,37 @@ CREATE TABLE VideoFiles (
 ```
 
 Indexes:
-- `idx_filehash` on `FileHash` for duplicate detection
+- `idx_filehash` on `FileHash` column for fast duplicate detection
 
-## LibVLC Integration
+## Settings Management
 
-### Initialization
-```csharp
-Core.Initialize();
-_libVLC = new LibVLC(enableDebugLogs: false);
-_mediaPlayer = new MediaPlayer(_libVLC);
+Settings are stored as JSON in the application data directory:
+
+```json
+{
+  "LastVideoPath": "C:\\Videos",
+  "WindowWidth": 1200,
+  "WindowHeight": 800,
+  "VideoExtensions": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"],
+  "DuplicateThreshold": 95
+}
 ```
 
-### Playing Video
-```csharp
-using var media = new Media(_libVLC, filePath, FromType.FromPath);
-_mediaPlayer.Media = media;
-_mediaPlayer.Play();
-```
-
-### Event Handling
-```csharp
-_mediaPlayer.PositionChanged += OnPositionChanged;
-_mediaPlayer.TimeChanged += OnTimeChanged;
-_mediaPlayer.EndReached += OnEndReached;
-```
+Settings persist between application sessions.
 
 ## Error Handling
 
-### Video Player Errors
-- Catch `FileNotFoundException` for missing files
-- Handle `InvalidOperationException` for uninitialized player
-- Log all errors to LoggingService
+### General Principles
+- Use try-catch blocks for all I/O operations
+- Log errors to console
+- Display user-friendly messages in UI
+- Continue operation when possible
 
-### Deletion Errors
-- Try-catch around file deletion
-- Continue even if some files fail
-- Report success/failure counts
-- Update UI regardless of errors
+### Specific Scenarios
+- **Missing directory access**: Skip directory and continue
+- **File in use**: Log error and skip file
+- **Database error**: Display error message to user
+- **Cancelled operation**: Clean up and reset UI
 
 ## Building and Testing
 
@@ -254,151 +203,136 @@ dotnet run
 .\build.ps1 -Platform macOS
 ```
 
-## Extending Phase 2
+## Extending the Application
 
-### Adding Video Player Features
-
-1. **Add UI control** in `VideoPlayerControl.axaml`
-2. **Add event handler** in `VideoPlayerControl.axaml.cs`
-3. **Add service method** in `VideoPlayerService.cs` if needed
-4. **Update documentation**
-
-Example - Adding playback speed control:
-```csharp
-// In VideoPlayerService.cs
-public void SetPlaybackRate(float rate)
-{
-    if (_mediaPlayer != null)
-    {
-        _mediaPlayer.SetRate(rate);
-    }
-}
-
-// In VideoPlayerControl.axaml.cs
-private void SpeedButton_Click(object? sender, RoutedEventArgs e)
-{
-    _playerService?.SetPlaybackRate(1.5f);
-}
-```
-
-### Adding Deletion Features
-
-1. **Update UI** in `MainWindow.axaml` duplicate group template
-2. **Add handler** in `MainWindow.axaml.cs`
-3. **Update ViewModel** in `MainWindowViewModel.cs`
-4. **Test thoroughly** - deletion is permanent!
-
-## Performance Considerations
-
-### Video Playback
-- LibVLC handles decoding efficiently
-- Hardware acceleration enabled by default
-- UI updates limited to 100ms interval
-
-### File Deletion
-- Async operations prevent UI blocking
-- Individual file try-catch for resilience
-- Database operations batched when possible
-
-### Memory Management
-- Dispose MediaPlayer properly
-- Release media resources
-- Clean up event handlers
-
-## Security Considerations
-
-### File Deletion
-- Always confirm before deletion
-- Validate file selections
-- Enforce "keep at least one" rule
-- Log all deletion operations
-
-### Video Player
-- Validate file paths
-- Handle malformed media gracefully
-- Don't trust file extensions
-- Sanitize user input
-
-## Debugging Tips
-
-### Video Player Issues
-1. Check LibVLC initialization
-2. Verify media file exists
-3. Check file format support
-4. Review LibVLC logs
-
-### Deletion Issues
-1. Check file permissions
-2. Verify file isn't open
-3. Check database state
-4. Review application logs
-
-### UI Issues
-1. Check data binding
-2. Verify thread marshalling
-3. Check property notifications
-4. Review XAML for errors
-
-## Phase 3 Preparation
-
-### Thumbnail Generation
-- Research FFmpeg integration
-- Plan thumbnail storage
-- Design cache structure
-- Consider async generation
-
-### Implementation Approach
-1. Add FFmpeg NuGet package
-2. Create ThumbnailService
-3. Generate thumbnails during scan
-4. Store in database or cache
-5. Display in UI grid
-
-## Testing Checklist
-
-### Video Player
-- [ ] Plays various formats
-- [ ] Play/pause works
-- [ ] Seeking works smoothly
-- [ ] Volume control responsive
-- [ ] Fullscreen toggles correctly
-- [ ] Time display accurate
-- [ ] Handles errors gracefully
-
-### Duplicate Deletion
-- [ ] Finds duplicates correctly
-- [ ] UI displays checkboxes
-- [ ] Validates selections
-- [ ] Shows confirmation dialog
-- [ ] Deletes from filesystem
-- [ ] Updates database
-- [ ] Refreshes UI
-- [ ] Logs operations
-
-## Common Tasks
-
-### Add New Video Format Support
+### Adding New Video Formats
 1. Open `Models/AppSettings.cs`
 2. Add extension to `VideoExtensions` list
 3. Rebuild application
 
-### Customize Player Controls
-1. Edit `VideoPlayerControl.axaml`
-2. Add event handlers in `.axaml.cs`
-3. Update service methods if needed
+### Adding Database Fields
+1. Update `VideoFile` model in `Models/VideoFile.cs`
+2. Update SQL schema in `DatabaseService.InitializeDatabase()`
+3. Update `MapReaderToVideoFile()` method
+4. Update insert/update queries
 
-### Add Deletion Safeguards
-1. Update validation in `MainWindow.axaml.cs`
-2. Add checks in `MainWindowViewModel.cs`
-3. Update confirmation dialogs
+### Adding UI Features
+1. Add properties to `MainWindowViewModel`
+2. Update `MainWindow.axaml` with new UI elements
+3. Add event handlers in `MainWindow.axaml.cs`
+4. Implement logic in view model
 
-## Resources
+## Common Tasks
 
-- LibVLCSharp docs: https://code.videolan.org/videolan/LibVLCSharp
-- Avalonia docs: https://docs.avaloniaui.net/
-- .NET docs: https://docs.microsoft.com/dotnet/
+### Add Tooltip to UI Element
+```xml
+<Button Content="Click Me" 
+        ToolTip.Tip="This button does something"/>
+```
+
+### Add New Property with Notification
+```csharp
+private string _myProperty = string.Empty;
+
+public string MyProperty
+{
+    get => _myProperty;
+    set
+    {
+        if (_myProperty != value)
+        {
+            _myProperty = value;
+            OnPropertyChanged();
+        }
+    }
+}
+```
+
+### Run Background Task
+```csharp
+public async Task MyBackgroundTaskAsync()
+{
+    await Task.Run(() =>
+    {
+        // Long-running operation here
+    });
+}
+```
+
+## Troubleshooting
+
+### Application won't start
+- Check .NET 8.0 SDK is installed
+- Verify all NuGet packages restored
+- Check for missing dependencies
+
+### Database errors
+- Delete `videovault.db` file to reset
+- Check application data directory permissions
+- Verify SQLite package is installed
+
+### UI not updating
+- Ensure property implements `INotifyPropertyChanged`
+- Use `ObservableCollection` for lists
+- Check data binding syntax in XAML
+
+### Build fails
+- Run `dotnet restore` to restore packages
+- Check for syntax errors
+- Verify .NET SDK version
+
+## Performance Considerations
+
+### File Scanning
+- Scanning is I/O bound, limited by disk speed
+- Use background threads to keep UI responsive
+- Consider caching file lists for frequently scanned directories
+
+### Hash Calculation
+- SHA256 is CPU intensive for large files
+- Calculate hashes on background threads
+- Consider parallel processing for multiple files
+
+### Database Operations
+- Use parameterized queries to prevent SQL injection
+- Create indexes on frequently queried columns
+- Batch insert operations when possible
+
+## Security Considerations
+
+### File Access
+- Validate all file paths before access
+- Handle unauthorized access exceptions
+- Don't trust user input for paths
+
+### Database
+- Use parameterized queries exclusively
+- Validate all input data
+- Handle SQL exceptions gracefully
+
+### User Data
+- Store sensitive settings securely
+- Don't log file paths in production
+- Respect user privacy
+
+## Future Development
+
+### Phase 2 Preparation
+- Research video player libraries (LibVLCSharp)
+- Plan fullscreen and minimized modes
+- Design player controls UI
+
+### Phase 3 Preparation
+- Research FFmpeg integration
+- Plan thumbnail cache structure
+- Design thumbnail display grid
+
+### Phase 4 Preparation
+- Identify metadata sources
+- Design scraping architecture
+- Plan rate limiting and caching
 
 ## Contact
 
-For questions or contributions:
+For questions or contributions, visit:
 https://github.com/rsgill1978/VideoVault
