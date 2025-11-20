@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 
 # Display build information
 Write-Host "================================================" -ForegroundColor Cyan
-Write-Host "VideoVault Build Script" -ForegroundColor Cyan
+Write-Host "VideoVault Build Script - Phase 2" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -51,7 +51,6 @@ function Build-ForRuntime {
             --runtime $RuntimeIdentifier `
             --self-contained true `
             --output $BuildOutput `
-            /p:PublishSingleFile=true `
             /p:PublishTrimmed=false
         
         if ($LASTEXITCODE -eq 0) {
@@ -99,4 +98,9 @@ Write-Host "To run the application:" -ForegroundColor Yellow
 Write-Host "  Windows: bin\Release\win-x64\VideoVault.exe" -ForegroundColor White
 Write-Host "  Linux:   bin/Release/linux-x64/VideoVault" -ForegroundColor White
 Write-Host "  macOS:   bin/Release/osx-x64/VideoVault" -ForegroundColor White
+Write-Host ""
+Write-Host "Phase 2 Features:" -ForegroundColor Yellow
+Write-Host "  [OK] Video Player with playback controls" -ForegroundColor Green
+Write-Host "  [OK] Fullscreen mode" -ForegroundColor Green
+Write-Host "  [OK] Duplicate file deletion" -ForegroundColor Green
 Write-Host ""
