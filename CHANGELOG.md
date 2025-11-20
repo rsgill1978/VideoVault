@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Playback time display (current/total duration)
   - Double-click video area to toggle fullscreen
   - ESC key to exit fullscreen mode
-  - Video player collapse/expand functionality
+  - Video player collapse/expand functionality with proper space management
 
 - **Duplicate File Deletion**
   - Delete marked duplicate files from groups
@@ -42,12 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Phase 2 Bugs:**
-  - Video player pane now properly collapses and expands
-  - Video plays embedded in main window (no more external overlay)
+  - Video player pane now properly collapses with video library expanding to fill space
+  - Video plays embedded in NativeControlHost control (not in overlay covering entire window)
   - ESC key correctly exits fullscreen mode
   - Fullscreen uses main window instead of creating separate overlay window
   - Video playback never blocks access to main application window
-  - X button on fullscreen properly returns to windowed mode (not exit app)
+  - Collapse button properly hides video player and allows other panes to expand
 
 - **Critical Startup Issues:**
   - Fixed NativeControlHost crash on Windows due to missing app manifest
@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed null reference issues with ViewModel
   - Prevented app crash when database initialization fails
   - Added comprehensive logging for startup troubleshooting
+
+- **Video Rendering Issues:**
+  - Fixed LibVLC rendering to entire main window instead of video control
+  - Properly attached video output to NativeControlHost handle
+  - Video now renders only in the designated video player area
 
 ### Changed
 - **Documentation Consolidation:**

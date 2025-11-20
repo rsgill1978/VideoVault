@@ -84,7 +84,7 @@
         <Grid Grid.Row="3" Margin="10,0,10,10" Name="VideoPlayerRow">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="400"/>
+                <RowDefinition Height="Auto" Name="VideoPlayerContentRow"/>
             </Grid.RowDefinitions>
             
             <!-- Video Player Header with Collapse Button -->
@@ -104,8 +104,8 @@
             <!-- Video Player Content -->
             <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" 
                    CornerRadius="0,0,5,5" Padding="5" Background="White"
-                   Name="VideoPlayerContent" Height="400">
-                <local:VideoPlayerControl Name="VideoPlayer" />
+                   Name="VideoPlayerContent">
+                <local:VideoPlayerControl Name="VideoPlayer" Height="400" />
             </Border>
         </Grid>
 

@@ -64,27 +64,35 @@ public partial class VideoPlayerControl : UserControl
             // Attach LibVLC video output to the native control host
             if (_playerService.MediaPlayer != null && VideoHost != null)
             {
-                Console.WriteLine("Attempting to attach video output...");
+                Console.WriteLine("Attempting to attach video output to NativeControlHost...");
                 
-                // For NativeControlHost, we need to wait for it to be attached and get the handle differently
-                // LibVLC on Windows needs the parent window handle
-                var topLevel = TopLevel.GetTopLevel(this);
-                if (topLevel != null)
+                // Subscribe to the NativeControlHost's Initialized event to get its handle
+                VideoHost.Initialized += (s, e) =>
                 {
-                    var handle = topLevel.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
-                    
-                    Console.WriteLine($"Got handle: {handle}");
-                    
-                    if (handle != IntPtr.Zero)
+                    try
                     {
-                        _playerService.MediaPlayer.Hwnd = handle;
-                        Console.WriteLine("Video output attached to window");
+                        // Get the platform handle of the NativeControlHost
+                        var handle = VideoHost.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+                        
+                        Console.WriteLine($"NativeControlHost handle: {handle}");
+                        
+                        if (handle != IntPtr.Zero && _playerService.MediaPlayer != null)
+                        {
+                            _playerService.MediaPlayer.Hwnd = handle;
+                            Console.WriteLine("Video output attached to NativeControlHost");
+                        }
+                        else
+                        {
+                            Console.WriteLine("WARNING: Could not get valid NativeControlHost handle");
+                        }
                     }
-                    else
+                    catch (Exception ex2)
                     {
-                        Console.WriteLine("WARNING: Could not get valid window handle");
+                        Console.WriteLine($"ERROR attaching to NativeControlHost: {ex2.Message}");
                     }
-                }
+                };
+                
+                Console.WriteLine("Waiting for NativeControlHost initialization...");
             }
             else
             {

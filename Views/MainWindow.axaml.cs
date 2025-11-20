@@ -146,7 +146,6 @@ public partial class MainWindow : Window
             // Collapse video player
             if (VideoPlayerContent != null)
             {
-                VideoPlayerContent.Height = 0;
                 VideoPlayerContent.IsVisible = false;
             }
             if (VideoPlayerCollapseButton != null)
@@ -166,7 +165,6 @@ public partial class MainWindow : Window
             // Expand video player
             if (VideoPlayerContent != null)
             {
-                VideoPlayerContent.Height = 400;
                 VideoPlayerContent.IsVisible = true;
             }
             if (VideoPlayerCollapseButton != null)
