@@ -483,6 +483,22 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
+    /// Show controls and restart auto-hide timer (for fullscreen mode)
+    /// </summary>
+    public void ShowControlsWithAutoHide()
+    {
+        if (!_isInFullscreenMode) return;
+
+        _logger.LogDebug("ShowControlsWithAutoHide called");
+
+        SetControlsVisibility(true);
+
+        // Restart the hide timer
+        _controlsHideTimer?.Stop();
+        _controlsHideTimer?.Start();
+    }
+
+    /// <summary>
     /// Enable fullscreen mode with auto-hide controls
     /// </summary>
     public void EnableFullscreenMode(bool enable)
@@ -491,22 +507,55 @@ public partial class VideoPlayerControl : UserControl
 
         if (enable)
         {
-            _logger.LogInfo("Enabling fullscreen mode");
+            _logger.LogInfo($"Enabling fullscreen mode - VideoPlayerControl Bounds: {this.Bounds}");
 
             // Ensure video container is visible
             if (VideoContainer != null)
             {
                 VideoContainer.IsVisible = true;
                 VideoContainer.ZIndex = 0;
+
+                // Force layout update on container
+                VideoContainer.InvalidateMeasure();
+                VideoContainer.InvalidateArrange();
+
                 _logger.LogInfo($"VideoContainer visible: {VideoContainer.IsVisible}, Bounds: {VideoContainer.Bounds}");
             }
 
-            // Ensure VLC host is visible
+            // Ensure VLC host is visible and force layout update
             if (_vlcHost != null)
             {
                 _vlcHost.IsVisible = true;
                 _vlcHost.ZIndex = 0;
+
+                // Force layout update and refresh VLC handle
+                _vlcHost.InvalidateVisual();
+                _vlcHost.InvalidateMeasure();
+                _vlcHost.InvalidateArrange();
+
                 _logger.LogInfo($"VlcHost visible: {_vlcHost.IsVisible}, Bounds: {_vlcHost.Bounds}");
+            }
+
+            // Re-set the VLC window handle after layout changes with a slight delay
+            if (_playerService?.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
+            {
+                _logger.LogInfo("Re-setting VLC window handle for fullscreen");
+
+                // Update handle immediately
+                _playerService.MediaPlayer.Hwnd = _videoHandle;
+
+                // Schedule another update after layout settles
+                Task.Delay(100).ContinueWith(_ =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (_playerService?.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
+                        {
+                            _logger.LogInfo("Re-setting VLC window handle after layout settled");
+                            _playerService.MediaPlayer.Hwnd = _videoHandle;
+                        }
+                    });
+                });
             }
 
             // Move controls to overlay position (Grid.Row=0 with VerticalAlignment=Bottom)
@@ -521,11 +570,20 @@ public partial class VideoPlayerControl : UserControl
                     Avalonia.Media.Color.FromArgb(200, 40, 40, 40)); // Semi-transparent dark background
             }
 
-            // Initially hide controls in fullscreen
-            SetControlsVisibility(false);
+            // Initially show controls in fullscreen (they will auto-hide after 3 seconds)
+            SetControlsVisibility(true);
+
+            // Ensure the control can capture pointer events by setting a transparent background
+            this.Background = Avalonia.Media.Brushes.Transparent;
 
             // Add mouse move handler to the entire control
             this.PointerMoved += OnPointerMovedInFullscreen;
+
+            // Add mouse move handler to video container as well (in case native control blocks events)
+            if (VideoContainer != null)
+            {
+                VideoContainer.PointerMoved += OnPointerMovedInFullscreen;
+            }
 
             // Add mouse enter/leave handlers to controls
             if (PlayerControls != null)
@@ -533,6 +591,10 @@ public partial class VideoPlayerControl : UserControl
                 PlayerControls.PointerEntered += OnControlsPointerEntered;
                 PlayerControls.PointerExited += OnControlsPointerExited;
             }
+
+            // Start the auto-hide timer
+            _controlsHideTimer?.Stop();
+            _controlsHideTimer?.Start();
         }
         else
         {
@@ -553,11 +615,19 @@ public partial class VideoPlayerControl : UserControl
             // Remove handlers when exiting fullscreen
             this.PointerMoved -= OnPointerMovedInFullscreen;
 
+            if (VideoContainer != null)
+            {
+                VideoContainer.PointerMoved -= OnPointerMovedInFullscreen;
+            }
+
             if (PlayerControls != null)
             {
                 PlayerControls.PointerEntered -= OnControlsPointerEntered;
                 PlayerControls.PointerExited -= OnControlsPointerExited;
             }
+
+            // Restore normal background
+            this.Background = null;
 
             // Stop the hide timer
             _controlsHideTimer?.Stop();
@@ -574,10 +644,13 @@ public partial class VideoPlayerControl : UserControl
     {
         if (!_isInFullscreenMode) return;
 
+        _logger.LogDebug("Pointer moved in fullscreen - showing controls");
+
         // Show controls
         Dispatcher.UIThread.Post(() =>
         {
             SetControlsVisibility(true);
+            _logger.LogDebug($"Controls visibility set to true, IsVisible: {PlayerControls?.IsVisible}");
         });
 
         // Restart the hide timer

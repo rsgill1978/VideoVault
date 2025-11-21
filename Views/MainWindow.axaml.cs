@@ -351,6 +351,9 @@ public partial class MainWindow : Window
             {
                 VideoPlayerRow.SetValue(Grid.RowProperty, 0);
                 VideoPlayerRow.SetValue(Grid.RowSpanProperty, 6);
+                // Change the row definitions to make video player fill space
+                VideoPlayerRow.RowDefinitions.Clear();
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Star)); // Fill remaining space
             }
 
             // Hide video player content border and make player fill space
@@ -359,20 +362,53 @@ public partial class MainWindow : Window
                 VideoPlayerContent.BorderThickness = new Avalonia.Thickness(0);
                 VideoPlayerContent.Padding = new Avalonia.Thickness(0);
                 VideoPlayerContent.Background = Avalonia.Media.Brushes.Transparent; // Remove white background
+                VideoPlayerContent.SetValue(Grid.RowProperty, 0); // Move to first row
             }
+
+            // Make window fullscreen first
+            WindowState = WindowState.FullScreen;
 
             if (VideoPlayer != null)
             {
                 VideoPlayer.Height = double.NaN; // Auto height to fill available space
-                // Enable fullscreen mode with auto-hide controls
-                VideoPlayer.EnableFullscreenMode(true);
+                VideoPlayer.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
             }
 
-            // Make window fullscreen
-            WindowState = WindowState.FullScreen;
+            // Wait for layout to actually update with real bounds before enabling fullscreen mode
+            if (VideoPlayer != null)
+            {
+                // Subscribe to layout updated event to know when bounds are ready
+                EventHandler? layoutHandler = null;
+                layoutHandler = async (s, e) =>
+                {
+                    if (VideoPlayer != null && VideoPlayer.Bounds.Height > 100)
+                    {
+                        // Layout is now complete with real bounds
+                        VideoPlayer.LayoutUpdated -= layoutHandler;
+
+                        // Give a small delay for any final adjustments
+                        await Task.Delay(50);
+
+                        if (VideoPlayer != null)
+                        {
+                            _logger.LogInfo($"Layout complete, VideoPlayer bounds: {VideoPlayer.Bounds}");
+                            VideoPlayer.EnableFullscreenMode(true);
+                        }
+                    }
+                };
+
+                VideoPlayer.LayoutUpdated += layoutHandler;
+
+                // Force layout update
+                VideoPlayer.InvalidateMeasure();
+                VideoPlayer.InvalidateArrange();
+            }
 
             // Add escape key handler
             KeyDown += OnFullscreenKeyDown;
+
+            // Add pointer moved handler to the window for fullscreen control visibility
+            PointerMoved += OnFullscreenPointerMoved;
         }
         catch (Exception ex)
         {
@@ -396,11 +432,15 @@ public partial class MainWindow : Window
             // Restore window state
             WindowState = WindowState.Normal;
 
-            // Restore video player row position
+            // Restore video player row position and definitions
             if (VideoPlayerRow != null)
             {
                 VideoPlayerRow.SetValue(Grid.RowProperty, 3);
                 VideoPlayerRow.SetValue(Grid.RowSpanProperty, 1);
+                // Restore original row definitions
+                VideoPlayerRow.RowDefinitions.Clear();
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Header
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Content
             }
 
             // Restore video player content border
@@ -409,12 +449,14 @@ public partial class MainWindow : Window
                 VideoPlayerContent.BorderThickness = new Avalonia.Thickness(1);
                 VideoPlayerContent.Padding = new Avalonia.Thickness(5);
                 VideoPlayerContent.Background = Avalonia.Media.Brushes.White; // Restore white background
+                VideoPlayerContent.SetValue(Grid.RowProperty, 1); // Move back to second row
             }
 
             // Restore video player height
             if (VideoPlayer != null)
             {
                 VideoPlayer.Height = 400;
+                VideoPlayer.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
                 // Disable fullscreen mode
                 VideoPlayer.EnableFullscreenMode(false);
             }
@@ -429,6 +471,9 @@ public partial class MainWindow : Window
 
             // Remove escape key handler
             KeyDown -= OnFullscreenKeyDown;
+
+            // Remove pointer moved handler
+            PointerMoved -= OnFullscreenPointerMoved;
 
             // Reset the VideoPlayer's fullscreen state to keep them in sync
             VideoPlayer?.ResetFullscreenState();
@@ -448,6 +493,28 @@ public partial class MainWindow : Window
         {
             ExitFullscreen();
         }
+    }
+
+    /// <summary>
+    /// Handle pointer moved in fullscreen mode to show/hide controls
+    /// </summary>
+    private void OnFullscreenPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isInFullscreen || VideoPlayer == null) return;
+
+        // Forward the pointer moved event to the video player control
+        // This ensures controls show even when pointer is over the native VLC control
+        _logger.LogDebug("Fullscreen window pointer moved - showing controls");
+
+        // Trigger the video player's control visibility with auto-hide
+        // Use Invoke instead of Post to ensure it happens immediately
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.ShowControlsWithAutoHide();
+            }
+        });
     }
 
     /// <summary>
