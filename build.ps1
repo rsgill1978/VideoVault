@@ -124,6 +124,39 @@ function Create-WindowsInstaller {
         # WiX not found
     }
 
+    # If WiX is not available, try to install it
+    if (-not $WixAvailable) {
+        Write-Host "WiX Toolset not found. Installing..." -ForegroundColor Yellow
+        try {
+            & dotnet tool install --global wix 2>&1 | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "WiX Toolset installed successfully!" -ForegroundColor Green
+
+                # Verify installation
+                try {
+                    $wixVersion = & wix --version 2>&1
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "WiX Toolset version: $wixVersion" -ForegroundColor Green
+                        $WixAvailable = $true
+                    }
+                }
+                catch {
+                    Write-Host "WARNING: WiX installed but not available in PATH. You may need to restart your terminal." -ForegroundColor Yellow
+                }
+            }
+            else {
+                Write-Host "WARNING: Failed to install WiX Toolset automatically." -ForegroundColor Yellow
+                Write-Host "Please install manually: dotnet tool install --global wix" -ForegroundColor Yellow
+            }
+        }
+        catch {
+            Write-Host "WARNING: Failed to install WiX Toolset: $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "Please install manually: dotnet tool install --global wix" -ForegroundColor Yellow
+        }
+        Write-Host ""
+    }
+
     if ($WixAvailable) {
         try {
             Write-Host "Creating MSI installer..." -ForegroundColor Yellow
@@ -214,10 +247,8 @@ function Create-WindowsInstaller {
         }
     }
     else {
-        Write-Host "WiX Toolset not found. Skipping MSI creation." -ForegroundColor Yellow
-        Write-Host "To create MSI installers, install WiX Toolset:" -ForegroundColor Yellow
-        Write-Host "  dotnet tool install --global wix" -ForegroundColor Cyan
-        Write-Host "ZIP package is available: $ZipPath" -ForegroundColor Yellow
+        Write-Host "WiX Toolset could not be installed automatically." -ForegroundColor Red
+        Write-Host "MSI creation skipped. ZIP package is available: $ZipPath" -ForegroundColor Yellow
     }
 
     Write-Host ""
@@ -237,6 +268,14 @@ function Create-MacDmg {
     Write-Host "Creating macOS application bundle..." -ForegroundColor Yellow
 
     $BuildOutput = Join-Path $OutputDir $RuntimeIdentifier
+
+    # Check if build output exists
+    if (-not (Test-Path $BuildOutput)) {
+        Write-Host "WARNING: Build output not found: $BuildOutput" -ForegroundColor Red
+        Write-Host "Skipping app bundle creation for $RuntimeIdentifier" -ForegroundColor Yellow
+        return
+    }
+
     $AppBundlePath = Join-Path $InstallerDir "VideoVault.app"
 
     # Create app bundle structure

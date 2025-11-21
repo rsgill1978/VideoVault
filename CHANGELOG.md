@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-Phase3] - 2025-11-21
+
+### Added
+- **Thumbnail Generation**
+  - Automatic thumbnail generation for all imported videos
+  - LibVLC-based thumbnail capture at 5-second mark
+  - 320x240 JPG thumbnails stored in `%APPDATA%\VideoVault\thumbnails`
+  - Thumbnails cached by video file hash to avoid regeneration
+  - `ThumbnailService` for managing thumbnail creation and cleanup
+
+- **Video Library Thumbnails**
+  - 80x60 thumbnail previews displayed in video library
+  - Video icon (📹) shown when thumbnail not available
+  - Grid layout with thumbnail on left, file info on right
+  - Maintains existing file size and extension display
+
+- **Platform-Specific Installers**
+  - **Windows MSI**: Per-user installer (no admin required)
+    - Installs to `%LOCALAPPDATA%\VideoVault`
+    - Start Menu shortcuts (app + uninstall)
+    - Automatic WiX Toolset installation
+    - ZIP package fallback
+  - **macOS Universal Binary**: Combined Intel + Apple Silicon
+    - .app bundle with Info.plist
+    - ZIP package distribution
+    - DMG creation support (on macOS)
+  - **Linux DEB**: Debian/Ubuntu/Mint package
+    - Package structure for `dpkg-deb`
+    - TAR.GZ alternative
+  - **Build Script Enhancement**: Automatic installer generation
+
+### Changed
+- Database schema: Added `ThumbnailPath TEXT` column
+- Database migration: Automatic column addition for existing databases
+- Updated `VideoFile` model with `ThumbnailPath` property
+- Enhanced build script with `-SkipInstallers` flag
+- Documentation consolidated: Merged INSTALLER-NOTES.md into README.md
+- Updated README.md for Phase 3 completion
+
+### Fixed
+- Universal macOS build: Added existence check before copying files
+- Build script: Properly handles missing build outputs
+
+### Technical Details
+- New `ThumbnailService.cs` using LibVLCSharp for snapshot generation
+- Database: `UpdateThumbnailPathAsync` method for storing thumbnail locations
+- WiX Toolset v4 integration for MSI creation
+- Cross-platform package creation (ZIP/TAR.GZ/DEB/DMG)
+- `.claude/` directory added to .gitignore
+
+---
+
 ## [1.0.0-Phase2-Hotfix2] - 2025-11-21
 
 ### Fixed

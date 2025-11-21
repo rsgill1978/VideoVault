@@ -1,8 +1,8 @@
 # VideoVault - Adult Video Catalog Application
 
-**Version:** 1.0.0 - Phase 2  
-**Platform:** Cross-platform (Windows, Linux, macOS)  
-**Framework:** .NET 8.0 + Avalonia UI 11.0  
+**Version:** 1.0.0 - Phase 3
+**Platform:** Cross-platform (Windows, Linux, macOS)
+**Framework:** .NET 8.0 + Avalonia UI 11.0
 **Repository:** https://github.com/rsgill1978/VideoVault
 
 ---
@@ -58,8 +58,16 @@ VideoVault is a cross-platform desktop application designed to catalog, organize
 - ✅ Automatic UI refresh after deletions
 - ✅ Collapsible video player pane
 
+### Phase 3: Thumbnails & Installers ✅
+- ✅ Automatic thumbnail generation for imported videos
+- ✅ Thumbnail display in video library (80x60 preview images)
+- ✅ Platform-specific installer generation:
+  - Windows: MSI installer (per-user, no admin required) + ZIP
+  - macOS: Universal .app bundle + ZIP
+  - Linux: DEB package structure + TAR.GZ
+- ✅ Automatic WiX Toolset installation for MSI creation
+
 ### Coming Soon
-- 🔄 **Phase 3**: Automatic thumbnail generation, installer generation
 - 🔄 **Phase 4**: Web scraping for metadata, performer identification, act cataloging
 - 🔄 **Phase 5**: Metadata editing capabilities
 - 🔄 **Phase 6**: Advanced search and filtering options
@@ -91,34 +99,57 @@ VideoVault is a cross-platform desktop application designed to catalog, organize
 
 ## Installation
 
+### Windows Installation
+
+**MSI Installer (Recommended)**
+- Download `VideoVault-Setup-x64.msi` from releases
+- Double-click to install (no admin rights required)
+- Installs to: `%LOCALAPPDATA%\VideoVault`
+- Creates Start Menu shortcuts
+- Uninstall via Windows Settings > Apps
+
+**ZIP Package (Portable)**
+- Extract `VideoVault-Windows-x64.zip` anywhere
+- Run `VideoVault.exe` directly
+- Portable - works from USB drives
+
+### macOS Installation
+
+**ZIP Package**
+- Extract `VideoVault-macOS-universal.zip` (or x64/arm64 specific)
+- Move `VideoVault.app` to `/Applications`
+- First launch: Right-click > Open (to bypass Gatekeeper)
+- Universal binary works on both Intel and Apple Silicon
+
+### Linux Installation
+
+**DEB Package (Debian/Ubuntu/Mint)**
+```bash
+sudo dpkg -i videovault-1.0.0-amd64.deb
+```
+
+**TAR.GZ Package**
+```bash
+tar -xzf VideoVault-Linux-x64.tar.gz -C ~/videovault
+cd ~/videovault
+./VideoVault
+```
+
 ### Build from Source
 
-1. **Clone the Repository**
+1. **Prerequisites**: .NET 8.0 SDK, PowerShell
+
+2. **Clone & Build**
    ```bash
    git clone https://github.com/rsgill1978/VideoVault.git
    cd VideoVault
-   ```
-
-2. **Restore Dependencies**
-   ```bash
    dotnet restore
+   .\build.ps1 -Platform All
    ```
 
-3. **Build the Application**
-   ```powershell
-   # Windows PowerShell
-   .\build.ps1
-   
-   # Or build for specific platform
-   .\build.ps1 -Platform Windows
-   .\build.ps1 -Platform Linux
-   .\build.ps1 -Platform macOS
-   ```
-
-4. **Run the Application**
-   - **Windows**: `bin\Release\win-x64\VideoVault.exe`
-   - **Linux**: `bin/Release/linux-x64/VideoVault`
-   - **macOS**: `bin/Release/osx-x64/VideoVault`
+3. **Output Locations**
+   - Binaries: `bin/Release/{runtime}/`
+   - Installers: `installers/`
 
 ---
 
@@ -229,8 +260,8 @@ Video cataloging, scanning, duplicate detection, settings, logging
 ### ✅ Phase 2: Video Player & Deletion
 Embedded player, controls, fullscreen, duplicate deletion
 
-### 🔄 Phase 3: Thumbnails & Installers
-Auto thumbnail generation, DMG/EXE/DEB installers
+### ✅ Phase 3: Thumbnails & Installers
+Auto thumbnail generation, platform-specific installers (MSI/DMG/DEB)
 
 ### 🔄 Phase 4: Metadata & AI
 Web scraping, performer identification, act cataloging
@@ -268,9 +299,16 @@ CREATE TABLE VideoFiles (
     Resolution TEXT DEFAULT '',
     Extension TEXT NOT NULL,
     IsDuplicate INTEGER DEFAULT 0,
-    OriginalFileId INTEGER NULL
+    OriginalFileId INTEGER NULL,
+    ThumbnailPath TEXT DEFAULT ''
 );
 ```
+
+### Data Storage Locations
+- **Settings**: `%APPDATA%\VideoVault\settings.json`
+- **Database**: `%APPDATA%\VideoVault\videovault.db`
+- **Thumbnails**: `%APPDATA%\VideoVault\thumbnails\`
+- **Logs**: `%APPDATA%\VideoVault\logs\`
 
 ### Configuration
 Location: `%AppData%\VideoVault\appsettings.json` (Windows) or `~/.config/VideoVault/appsettings.json` (Linux/macOS)
