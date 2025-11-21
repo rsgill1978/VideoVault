@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ using VideoVault.Models;
 using VideoVault.Services;
 using static VideoVault.Services.LogLevel;
 
-namespace VideoVault;
+namespace VideoVault.ViewModels;
 
 /// <summary>
 /// ViewModel for the main window
@@ -34,46 +35,78 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
     public MainWindowViewModel()
     {
-        // Initialize logging service
-        _logger = LoggingService.Instance;
-        _logger.LogInfo("=== VideoVault Application Starting ===");
-
-        // Initialize services
-        _settings = AppSettings.Load();
-        _logger.LogInfo($"Settings loaded from configuration");
-
-        // Set logging level from settings
-        if (Enum.TryParse<LogLevel>(_settings.LogLevel, out var logLevel))
+        try
         {
-            _logger.SetMinimumLevel(logLevel);
+            // Initialize logging service
+            _logger = LoggingService.Instance;
+            _logger.LogInfo("=== VideoVault Application Starting ===");
+            _logger.LogInfo("Phase 2: Video Player Enabled");
+
+            // Initialize services
+            _settings = AppSettings.Load();
+            _logger.LogInfo($"Settings loaded from configuration");
+
+            // Set logging level from settings
+            if (Enum.TryParse<LogLevel>(_settings.LogLevel, out var logLevel))
+            {
+                _logger.SetMinimumLevel(logLevel);
+            }
+
+            // Clean old log files
+            _logger.CleanOldLogs(_settings.LogRetentionDays);
+
+            _databaseService = new DatabaseService();
+            _logger.LogInfo("Database service initialized");
+
+            _fileScannerService = new FileScannerService(_settings);
+            _logger.LogInfo("File scanner service initialized");
+
+            _duplicateFinderService = new DuplicateFinderService(_databaseService);
+            _logger.LogInfo("Duplicate finder service initialized");
+
+            // Subscribe to scanner events
+            _fileScannerService.ProgressChanged += OnScanProgressChanged;
+            _fileScannerService.FileProcessed += OnFileProcessed;
+
+            // Subscribe to duplicate finder events
+            _duplicateFinderService.ProgressChanged += OnDuplicateProgressChanged;
+            _duplicateFinderService.DuplicateFound += OnDuplicateFound;
+
+            // Set initial video path from settings
+            VideoPath = _settings.LastVideoPath;
+            _logger.LogInfo($"Initial video path: {VideoPath}");
+
+            // Load existing videos from database asynchronously
+            // Use Task.Run to avoid blocking constructor
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await LoadVideosAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Failed to load initial videos", ex);
+                }
+            });
+            
+            _logger.LogInfo("MainWindowViewModel initialized successfully");
         }
-
-        // Clean old log files
-        _logger.CleanOldLogs(_settings.LogRetentionDays);
-
-        _databaseService = new DatabaseService();
-        _logger.LogInfo("Database service initialized");
-
-        _fileScannerService = new FileScannerService(_settings);
-        _logger.LogInfo("File scanner service initialized");
-
-        _duplicateFinderService = new DuplicateFinderService(_databaseService);
-        _logger.LogInfo("Duplicate finder service initialized");
-
-        // Subscribe to scanner events
-        _fileScannerService.ProgressChanged += OnScanProgressChanged;
-        _fileScannerService.FileProcessed += OnFileProcessed;
-
-        // Subscribe to duplicate finder events
-        _duplicateFinderService.ProgressChanged += OnDuplicateProgressChanged;
-        _duplicateFinderService.DuplicateFound += OnDuplicateFound;
-
-        // Set initial video path from settings
-        VideoPath = _settings.LastVideoPath;
-        _logger.LogInfo($"Initial video path: {VideoPath}");
-
-        // Load existing videos from database
-        _ = LoadVideosAsync();
+        catch (Exception ex)
+        {
+            // Log critical initialization error
+            Console.WriteLine($"CRITICAL ERROR: Failed to initialize MainWindowViewModel: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            
+            // Try to log if logger is available
+            if (_logger != null)
+            {
+                _logger.LogError("Critical initialization error in MainWindowViewModel", ex);
+            }
+            
+            // Re-throw to prevent app from starting with broken state
+            throw new Exception("Failed to initialize VideoVault. Check logs for details.", ex);
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -367,24 +400,65 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// Delete selected duplicate group
+    /// Delete marked duplicate files
     /// </summary>
-    public async Task DeleteDuplicateGroupAsync(DuplicateGroup group, int keepFileId)
+    public async Task DeleteMarkedDuplicatesAsync(DuplicateGroup group, List<VideoFile> filesToDelete)
     {
         try
         {
-            await _duplicateFinderService.DeleteDuplicatesAsync(group, keepFileId);
+            _logger.LogInfo($"=== Starting deletion of {filesToDelete.Count} marked duplicates ===");
 
-            // Reload videos
+            int deletedCount = 0;
+            int failedCount = 0;
+
+            foreach (var file in filesToDelete)
+            {
+                try
+                {
+                    _logger.LogInfo($"Deleting file: {file.FilePath}");
+
+                    // Delete file from filesystem
+                    if (File.Exists(file.FilePath))
+                    {
+                        File.Delete(file.FilePath);
+                        _logger.LogDebug($"File deleted from filesystem: {file.FileName}");
+                    }
+
+                    // Delete from database
+                    await _databaseService.DeleteVideoAsync(file.Id);
+                    _logger.LogDebug($"File removed from database: {file.FileName}");
+
+                    deletedCount++;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Failed to delete file: {file.FilePath}", ex);
+                    failedCount++;
+                }
+            }
+
+            _logger.LogInfo($"Deletion complete: {deletedCount} deleted, {failedCount} failed");
+
+            // Reload videos from database
             await LoadVideosAsync();
 
-            // Remove from duplicate groups
-            DuplicateGroups.Remove(group);
+            // Remove files from duplicate group
+            foreach (var file in filesToDelete)
+            {
+                group.Files.Remove(file);
+            }
 
-            ScanStatus = "Duplicates deleted successfully.";
+            // Remove group if it has less than 2 files
+            if (group.Files.Count < 2)
+            {
+                DuplicateGroups.Remove(group);
+            }
+
+            ScanStatus = $"Deleted {deletedCount} duplicate file(s).";
         }
         catch (Exception ex)
         {
+            _logger.LogError("Failed to delete duplicates", ex);
             ScanStatus = $"Error deleting duplicates: {ex.Message}";
         }
     }

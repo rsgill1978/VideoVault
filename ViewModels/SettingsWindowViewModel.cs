@@ -3,7 +3,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using VideoVault.Models;
 
-namespace VideoVault;
+namespace VideoVault.ViewModels;
 
 /// <summary>
 /// ViewModel for the settings window

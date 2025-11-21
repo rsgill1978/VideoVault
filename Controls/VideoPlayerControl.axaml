@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="VideoVault.Controls.VideoPlayerControl">
+
+    <Grid RowDefinitions="*,Auto">
+        
+        <!-- Video Display Area -->
+        <Panel Grid.Row="0" Background="Black" Name="VideoContainer"
+               ToolTip.Tip="Video display area - Double click for fullscreen">
+            <!-- NativeControlHost for LibVLC video rendering -->
+            <NativeControlHost Name="VideoHost" IsVisible="True"/>
+            <TextBlock Text="No video loaded" 
+                      Foreground="White" 
+                      HorizontalAlignment="Center" 
+                      VerticalAlignment="Center"
+                      Name="NoVideoText"/>
+        </Panel>
+
+        <!-- Player Controls -->
+        <Border Grid.Row="1" Background="#F0F0F0" Padding="10">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                
+                <!-- Play/Pause Button -->
+                <Button Grid.Column="0" Name="PlayPauseButton" Click="PlayPauseButton_Click"
+                       Width="40" Height="40" Margin="0,0,10,0"
+                       ToolTip.Tip="Play or pause video">
+                    <TextBlock Text="▶" FontSize="20" HorizontalAlignment="Center"/>
+                </Button>
+
+                <!-- Progress Slider -->
+                <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
+                    <Slider Grid.Row="0" Name="ProgressSlider" 
+                           Minimum="0" Maximum="100" 
+                           ValueChanged="ProgressSlider_ValueChanged"
+                           ToolTip.Tip="Seek through video"/>
+                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,5,0,0">
+                        <TextBlock Grid.Column="0" Name="TimeText" Text="00:00:00" 
+                                 FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Name="DurationText" Text="00:00:00" 
+                                 FontSize="11" VerticalAlignment="Center"/>
+                    </Grid>
+                </Grid>
+
+                <!-- Volume Control -->
+                <Grid Grid.Column="2" ColumnDefinitions="Auto,Auto" Margin="10,0,10,0">
+                    <Button Grid.Column="0" Name="VolumeButton" Click="VolumeButton_Click"
+                           Width="40" Height="40"
+                           ToolTip.Tip="Mute or unmute audio">
+                        <TextBlock Text="🔊" FontSize="16"/>
+                    </Button>
+                    <Slider Grid.Column="1" Name="VolumeSlider" 
+                           Width="100" Minimum="0" Maximum="100" Value="100"
+                           ValueChanged="VolumeSlider_ValueChanged"
+                           VerticalAlignment="Center"
+                           ToolTip.Tip="Adjust volume"/>
+                </Grid>
+
+                <!-- Fullscreen Button -->
+                <Button Grid.Column="3" Name="FullscreenButton" Click="FullscreenButton_Click"
+                       Width="40" Height="40"
+                       ToolTip.Tip="Toggle fullscreen mode">
+                    <TextBlock Text="⛶" FontSize="20"/>
+                </Button>
+
+            </Grid>
+        </Border>
+
+    </Grid>
+</UserControl>

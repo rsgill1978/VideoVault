@@ -5,8 +5,9 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using VideoVault.Models;
 using VideoVault.Services;
+using VideoVault.ViewModels;
 
-namespace VideoVault;
+namespace VideoVault.Views;
 
 public partial class SettingsWindow : Window
 {

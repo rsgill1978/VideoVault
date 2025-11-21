@@ -9,8 +9,22 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+        try
+        {
+            Console.WriteLine("VideoVault starting...");
+            
+            var exitCode = BuildAvaloniaApp()
+                .StartWithClassicDesktopLifetime(args);
+            
+            Console.WriteLine($"Application exited with code: {exitCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FATAL ERROR: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadKey();
+        }
     }
 
     // Configure Avalonia application
