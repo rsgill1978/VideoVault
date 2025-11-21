@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!--
+    VideoVault MSI Installer
+    Installs per-user to %LOCALAPPDATA%\VideoVault
+    No administrator privileges required
+  -->
+  <Package Name="VideoVault"
+           Manufacturer="VideoVault Team"
+           Version="1.0.0.0"
+           UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
+           InstallerVersion="500"
+           Compressed="yes"
+           Scope="perUser">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of VideoVault is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Install to user's LocalAppData folder -->
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="VideoVault" />
+    </StandardDirectory>
+
+    <!-- Create Start Menu shortcut directory -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="VideoVault" />
+    </StandardDirectory>
+
+    <!-- Main feature containing all components -->
+    <Feature Id="MainFeature" Title="VideoVault Application" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
+
+    <!-- Application files will be generated via heat.exe harvest -->
+    <!-- This placeholder will be replaced during build -->
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER" />
+
+    <!-- Start Menu shortcut component -->
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="VideoVault"
+                Description="Adult Video Catalog Application"
+                Target="[INSTALLFOLDER]VideoVault.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+
+      <Shortcut Id="UninstallShortcut"
+                Name="Uninstall VideoVault"
+                Description="Uninstalls VideoVault"
+                Target="[System64Folder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+
+      <RemoveFolder Id="CleanUpShortCut" Directory="ApplicationProgramsFolder" On="uninstall" />
+
+      <!-- Registry key to make this component valid -->
+      <RegistryValue Root="HKCU"
+                     Key="Software\VideoVault"
+                     Name="Installed"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+  </Package>
+</Wix>

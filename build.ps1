@@ -102,21 +102,122 @@ function Create-WindowsInstaller {
 
     $BuildOutput = Join-Path $OutputDir $RuntimeIdentifier
 
-    # Create ZIP package for Windows
+    # Create ZIP package for Windows (always create as fallback)
     Write-Host "Creating ZIP package for Windows..." -ForegroundColor Yellow
     $ZipPath = Join-Path $InstallerDir "VideoVault-Windows-x64.zip"
     Compress-Archive -Path "$BuildOutput\*" -DestinationPath $ZipPath -Force
     Write-Host "Windows package created: $ZipPath" -ForegroundColor Green
+    Write-Host ""
 
     # Check if WiX Toolset is installed for MSI creation
-    $WixToolsetPath = "wix"
+    Write-Host "Checking for WiX Toolset..." -ForegroundColor Yellow
+    $WixAvailable = $false
+
     try {
-        $wixCheck = & $WixToolsetPath --version 2>&1
-        Write-Host "WiX Toolset found: $wixCheck - MSI creation available" -ForegroundColor Green
-        # TODO: Implement WiX-based MSI creation here
+        $wixVersion = & wix --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "WiX Toolset found: $wixVersion" -ForegroundColor Green
+            $WixAvailable = $true
+        }
     }
     catch {
-        Write-Host "Note: WiX Toolset not found. Install via 'dotnet tool install --global wix' to create MSI installers." -ForegroundColor Yellow
+        # WiX not found
+    }
+
+    if ($WixAvailable) {
+        try {
+            Write-Host "Creating MSI installer..." -ForegroundColor Yellow
+
+            $WxsFile = Join-Path $ProjectDir "VideoVault.wxs"
+            $WixObjDir = Join-Path $InstallerDir "wixobj"
+            $HarvestedWxs = Join-Path $WixObjDir "HarvestedFiles.wxs"
+            $MsiPath = Join-Path $InstallerDir "VideoVault-Setup-x64.msi"
+
+            # Ensure wixobj directory exists
+            if (-not (Test-Path $WixObjDir)) {
+                New-Item -ItemType Directory -Path $WixObjDir -Force | Out-Null
+            }
+
+            # Harvest files from build output directory
+            Write-Host "  Harvesting application files..." -ForegroundColor Cyan
+
+            & wix extension add WixToolset.Heat 2>&1 | Out-Null
+
+            # Use heat to harvest all files from the build output
+            $heatArgs = @(
+                "dir"
+                $BuildOutput
+                "-out"
+                $HarvestedWxs
+                "-cg"
+                "ApplicationFiles"
+                "-dr"
+                "INSTALLFOLDER"
+                "-gg"
+                "-sfrag"
+                "-srd"
+                "-ke"
+            )
+
+            & wix heat $heatArgs 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  WARNING: Heat harvesting had warnings, continuing..." -ForegroundColor Yellow
+            }
+
+            # Build the MSI
+            Write-Host "  Compiling MSI package..." -ForegroundColor Cyan
+
+            $buildArgs = @(
+                "build"
+                "-arch"
+                "x64"
+                "-src"
+                $WxsFile
+                "-src"
+                $HarvestedWxs
+                "-out"
+                $MsiPath
+                "-ext"
+                "WixToolset.Util.wixext"
+            )
+
+            & wix $buildArgs 2>&1 | ForEach-Object {
+                $line = $_.ToString()
+                if ($line -match "error") {
+                    Write-Host "  $line" -ForegroundColor Red
+                }
+                elseif ($line -match "warning") {
+                    Write-Host "  $line" -ForegroundColor Yellow
+                }
+                else {
+                    Write-Host "  $line" -ForegroundColor Gray
+                }
+            }
+
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $MsiPath)) {
+                $msiSize = (Get-Item $MsiPath).Length / 1MB
+                Write-Host "MSI installer created successfully!" -ForegroundColor Green
+                Write-Host "  File: $MsiPath" -ForegroundColor Cyan
+                Write-Host "  Size: $($msiSize.ToString('F2')) MB" -ForegroundColor Cyan
+                Write-Host "  Installation location: %LOCALAPPDATA%\VideoVault" -ForegroundColor Cyan
+                Write-Host "  Install mode: Per-User (no admin privileges required)" -ForegroundColor Cyan
+            }
+            else {
+                Write-Host "WARNING: MSI creation failed. See output above for details." -ForegroundColor Red
+                Write-Host "ZIP package is available as fallback: $ZipPath" -ForegroundColor Yellow
+            }
+        }
+        catch {
+            Write-Host "ERROR: Failed to create MSI: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "ZIP package is available as fallback: $ZipPath" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "WiX Toolset not found. Skipping MSI creation." -ForegroundColor Yellow
+        Write-Host "To create MSI installers, install WiX Toolset:" -ForegroundColor Yellow
+        Write-Host "  dotnet tool install --global wix" -ForegroundColor Cyan
+        Write-Host "ZIP package is available: $ZipPath" -ForegroundColor Yellow
     }
 
     Write-Host ""

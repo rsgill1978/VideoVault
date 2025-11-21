@@ -118,6 +118,9 @@ Icon
 # Ignore any generated manifests or configs if not committed
 # app.manifest is committed, so okay
 
+# Claude Code
+.claude/
+
 # Installers and packages
 installers/
 installers/**
@@ -126,3 +129,8 @@ installers/**
 *.deb
 *.dmg
 *.msi
+
+# WiX build artifacts
+wixobj/
+*.wixobj
+*.wixpdb
