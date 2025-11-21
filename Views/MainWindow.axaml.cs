@@ -63,6 +63,7 @@ public partial class MainWindow : Window
                         }
                         
                         VideoPlayer.FullscreenToggled += OnFullscreenToggled;
+                        VideoPlayer.VideoStarted += OnVideoStarted;
                         _logger.LogInfo("Video player initialized successfully");
                     }
                     catch (Exception ex)
@@ -204,8 +205,8 @@ public partial class MainWindow : Window
                 _logger.LogWarning($"Selected video file not found: {filePath}");
                 return;
             }
-            
-            // Load selected video
+
+            // Load selected video (name will be updated when playback starts)
             VideoPlayer.LoadVideo(filePath);
         }
         catch (Exception ex)
@@ -252,6 +253,21 @@ public partial class MainWindow : Window
             // Delete files
             await ViewModel.DeleteMarkedDuplicatesAsync(group, filesToDelete);
         }
+    }
+
+    /// <summary>
+    /// Handle video started event
+    /// </summary>
+    private void OnVideoStarted(string videoName)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (CurrentVideoName != null)
+            {
+                CurrentVideoName.Text = videoName;
+                _logger.LogInfo($"Updated video name display: {videoName}");
+            }
+        });
     }
 
     /// <summary>

@@ -32,6 +32,36 @@ public class VideoFile : INotifyPropertyChanged
     public long FileSize { get; set; }
 
     /// <summary>
+    /// Formatted file size (MB or GB)
+    /// </summary>
+    public string FormattedFileSize
+    {
+        get
+        {
+            const long KB = 1024;
+            const long MB = KB * 1024;
+            const long GB = MB * 1024;
+
+            if (FileSize >= GB)
+            {
+                return $"{FileSize / (double)GB:F2} GB";
+            }
+            else if (FileSize >= MB)
+            {
+                return $"{FileSize / (double)MB:F2} MB";
+            }
+            else if (FileSize >= KB)
+            {
+                return $"{FileSize / (double)KB:F2} KB";
+            }
+            else
+            {
+                return $"{FileSize} bytes";
+            }
+        }
+    }
+
+    /// <summary>
     /// SHA256 hash of the file for duplicate detection
     /// </summary>
     public string FileHash { get; set; } = string.Empty;
