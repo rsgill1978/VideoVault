@@ -23,10 +23,10 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="VideoVault.Controls.VideoPlayerControl">
 
-    <!-- Outer grid that holds both the normal layout and fullscreen overlay -->
-    <Grid>
+    <!-- Outer panel that holds both the normal layout and fullscreen overlay -->
+    <Panel>
         <!-- Inner grid with normal layout: video area and controls below -->
-        <Grid RowDefinitions="*,Auto" Name="NormalLayout">
+        <Grid RowDefinitions="*,Auto" Name="NormalLayout" ZIndex="0">
 
             <!-- Video Display Area (Row 0) - Black panel containing the video renderer -->
             <Panel Grid.Row="0" Background="Black" Name="VideoContainer"
@@ -123,18 +123,22 @@
         </Grid>
 
         <!-- Fullscreen overlay controls - Hidden in normal mode, visible in fullscreen -->
-        <!-- ZIndex 100 ensures this renders above video -->
-        <!-- This Border contains a duplicate set of controls for fullscreen mode -->
-        <!-- HorizontalAlignment Stretch ensures it fills width -->
-        <Border Name="FullscreenControls"
-                IsVisible="False"
-                VerticalAlignment="Bottom"
-                HorizontalAlignment="Stretch"
-                Margin="0,0,0,10"
-                Background="#C8282828"
-                Padding="10"
-                ZIndex="100"
-                ToolTip.Tip="Fullscreen playback controls - Move mouse to show, automatically hide after 3 seconds">
+        <!-- DockPanel allows positioning at bottom while filling width -->
+        <!-- ZIndex 100 ensures this renders above video and normal layout -->
+        <DockPanel Name="FullscreenControlsCanvas"
+                   IsVisible="False"
+                   ZIndex="100"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
+                   LastChildFill="False">
+
+            <!-- Border docked to bottom -->
+            <Border Name="FullscreenControls"
+                    DockPanel.Dock="Bottom"
+                    Margin="0,0,0,10"
+                    Background="#C8282828"
+                    Padding="10"
+                    ToolTip.Tip="Fullscreen playback controls - Move mouse to show, automatically hide after 3 seconds">
 
             <!-- Same control layout as normal mode -->
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
@@ -188,5 +192,7 @@
             </Grid>
         </Border>
 
-    </Grid>
+        </DockPanel>
+
+    </Panel>
 </UserControl>

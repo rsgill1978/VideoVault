@@ -508,12 +508,12 @@ public partial class VideoPlayerControl : UserControl
     /// <param name="visible">True to show controls, false to hide</param>
     public void SetControlsVisibility(bool visible)
     {
-        // In fullscreen mode, control fullscreen overlay controls
+        // In fullscreen mode, control fullscreen overlay canvas
         if (_isInFullscreenMode)
         {
-            if (FullscreenControls != null)
+            if (FullscreenControlsCanvas != null)
             {
-                FullscreenControls.IsVisible = visible;
+                FullscreenControlsCanvas.IsVisible = visible;
             }
         }
         else
@@ -545,10 +545,13 @@ public partial class VideoPlayerControl : UserControl
         if ((now - _lastControlsLogTime).TotalSeconds >= 1.0)
         {
             _lastControlsLogTime = now;
+            if (FullscreenControlsCanvas != null)
+            {
+                _logger.LogInfo($"FullscreenControlsCanvas: IsVisible={FullscreenControlsCanvas.IsVisible}, Bounds={FullscreenControlsCanvas.Bounds}");
+            }
             if (FullscreenControls != null)
             {
-                _logger.LogInfo($"FullscreenControls: IsVisible={FullscreenControls.IsVisible}, Bounds={FullscreenControls.Bounds}, " +
-                               $"ZIndex={FullscreenControls.ZIndex}, VerticalAlignment={FullscreenControls.VerticalAlignment}");
+                _logger.LogInfo($"FullscreenControls Border: IsVisible={FullscreenControls.IsVisible}, Bounds={FullscreenControls.Bounds}");
             }
         }
 
@@ -577,25 +580,26 @@ public partial class VideoPlayerControl : UserControl
                 PlayerControls.IsVisible = false;
             }
 
-            // Show fullscreen overlay controls
-            if (FullscreenControls != null)
+            // Show fullscreen overlay canvas
+            if (FullscreenControlsCanvas != null)
             {
-                FullscreenControls.IsVisible = true;
+                FullscreenControlsCanvas.IsVisible = true;
 
-                // Force layout update on fullscreen controls
-                FullscreenControls.InvalidateMeasure();
-                FullscreenControls.InvalidateArrange();
+                // Force layout update on fullscreen controls canvas
+                FullscreenControlsCanvas.InvalidateMeasure();
+                FullscreenControlsCanvas.InvalidateArrange();
 
                 // Log fullscreen controls state
-                _logger.LogInfo($"Fullscreen controls shown: IsVisible={FullscreenControls.IsVisible}, Bounds={FullscreenControls.Bounds}");
+                _logger.LogInfo($"Fullscreen controls canvas shown: IsVisible={FullscreenControlsCanvas.IsVisible}, Bounds={FullscreenControlsCanvas.Bounds}");
 
                 // Schedule logging after layout completes
                 Task.Delay(100).ContinueWith(_ =>
                 {
                     Dispatcher.UIThread.Post(() =>
                     {
-                        if (FullscreenControls != null)
+                        if (FullscreenControlsCanvas != null && FullscreenControls != null)
                         {
+                            _logger.LogInfo($"Fullscreen canvas after layout: Bounds={FullscreenControlsCanvas.Bounds}");
                             _logger.LogInfo($"Fullscreen controls after layout: Bounds={FullscreenControls.Bounds}, IsVisible={FullscreenControls.IsVisible}");
                         }
                     });
@@ -617,14 +621,14 @@ public partial class VideoPlayerControl : UserControl
                 VideoContainer.PointerMoved += OnPointerMovedInFullscreen;
             }
 
-            // Attach handlers to fullscreen controls for auto-hide pause
-            if (FullscreenControls != null)
+            // Attach handlers to fullscreen controls canvas for auto-hide pause
+            if (FullscreenControlsCanvas != null)
             {
-                // Stop auto-hide when mouse enters controls
-                FullscreenControls.PointerEntered += OnControlsPointerEntered;
+                // Stop auto-hide when mouse enters controls area
+                FullscreenControlsCanvas.PointerEntered += OnControlsPointerEntered;
 
-                // Restart auto-hide when mouse leaves controls
-                FullscreenControls.PointerExited += OnControlsPointerExited;
+                // Restart auto-hide when mouse leaves controls area
+                FullscreenControlsCanvas.PointerExited += OnControlsPointerExited;
             }
 
             // Start auto-hide timer
@@ -642,10 +646,10 @@ public partial class VideoPlayerControl : UserControl
                 PlayerControls.IsVisible = true;
             }
 
-            // Hide fullscreen overlay controls
-            if (FullscreenControls != null)
+            // Hide fullscreen overlay canvas
+            if (FullscreenControlsCanvas != null)
             {
-                FullscreenControls.IsVisible = false;
+                FullscreenControlsCanvas.IsVisible = false;
             }
 
             // Remove pointer moved handlers
@@ -656,11 +660,11 @@ public partial class VideoPlayerControl : UserControl
                 VideoContainer.PointerMoved -= OnPointerMovedInFullscreen;
             }
 
-            // Remove fullscreen controls handlers
-            if (FullscreenControls != null)
+            // Remove fullscreen controls canvas handlers
+            if (FullscreenControlsCanvas != null)
             {
-                FullscreenControls.PointerEntered -= OnControlsPointerEntered;
-                FullscreenControls.PointerExited -= OnControlsPointerExited;
+                FullscreenControlsCanvas.PointerEntered -= OnControlsPointerEntered;
+                FullscreenControlsCanvas.PointerExited -= OnControlsPointerExited;
             }
 
             // Remove transparent background
