@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -269,54 +271,121 @@ public partial class MainWindow : Window
         });
     }
 
+    private bool _isInFullscreen = false;
+
     /// <summary>
     /// Handle fullscreen toggle
     /// </summary>
-    private async void OnFullscreenToggled(bool isFullscreen)
+    private void OnFullscreenToggled(bool isFullscreen)
     {
-        if (isFullscreen)
+        try
         {
-            await EnterFullscreen();
+            if (isFullscreen && !_isInFullscreen)
+            {
+                EnterFullscreen();
+            }
+            else if (!isFullscreen && _isInFullscreen)
+            {
+                ExitFullscreen();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Fullscreen is handled by the fullscreen window closing
-            // This code path shouldn't be hit
+            _logger.LogError("Error in OnFullscreenToggled", ex);
+            _isInFullscreen = false;
+            VideoPlayer?.ResetFullscreenState();
         }
     }
 
     /// <summary>
     /// Enter fullscreen mode
     /// </summary>
-    private async System.Threading.Tasks.Task EnterFullscreen()
+    private void EnterFullscreen()
     {
-        // Check if video is loaded
-        if (VideoPlayer == null || !VideoPlayer.IsVideoLoaded)
+        try
         {
-            _logger.LogWarning("Cannot enter fullscreen: No video loaded");
-            await ShowMessageBox("No Video", "Please load a video before entering fullscreen mode.");
-            return;
+            // Check if video is loaded
+            if (VideoPlayer == null || !VideoPlayer.IsVideoLoaded)
+            {
+                _logger.LogWarning("Cannot enter fullscreen: No video loaded");
+
+                // Reset the VideoPlayer's fullscreen state since we're not entering fullscreen
+                VideoPlayer?.ResetFullscreenState();
+
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await ShowMessageBox("No Video", "Please load a video before entering fullscreen mode.");
+                });
+                return;
+            }
+
+            _isInFullscreen = true;
+
+            // Hide all UI except video player
+            if (MainMenu != null) MainMenu.IsVisible = false;
+            if (PathSelectionRow != null) PathSelectionRow.IsVisible = false;
+            if (ProgressRow != null) ProgressRow.IsVisible = false;
+            if (VideoPlayerHeader != null) VideoPlayerHeader.IsVisible = false;
+            if (MainContentArea != null) MainContentArea.IsVisible = false;
+            if (StatusBar != null) StatusBar.IsVisible = false;
+
+            // Make window fullscreen
+            WindowState = WindowState.FullScreen;
+
+            // Add escape key handler
+            KeyDown += OnFullscreenKeyDown;
         }
-
-        _logger.LogInfo("Entering fullscreen mode");
-
-        var currentVideo = ViewModel?.SelectedVideo?.FileName ?? "Video";
-
-        // Create fullscreen window
-        var fullscreenWindow = new FullscreenVideoWindow();
-        fullscreenWindow.SetVideoPlayer(VideoPlayer, currentVideo);
-
-        // Show fullscreen window
-        await fullscreenWindow.ShowDialog(this);
-
-        // When window closes, restore video player to main window
-        var player = fullscreenWindow.GetVideoPlayer();
-        if (player != null && VideoPlayerContent is Border border)
+        catch (Exception ex)
         {
-            border.Child = player;
+            _logger.LogError("Failed to enter fullscreen mode", ex);
+            _isInFullscreen = false;
+            VideoPlayer?.ResetFullscreenState();
         }
+    }
 
-        _logger.LogInfo("Exited fullscreen mode");
+    /// <summary>
+    /// Exit fullscreen mode
+    /// </summary>
+    private void ExitFullscreen()
+    {
+        if (!_isInFullscreen) return;
+
+        try
+        {
+            _isInFullscreen = false;
+
+            // Restore window state
+            WindowState = WindowState.Normal;
+
+            // Show all UI elements
+            if (MainMenu != null) MainMenu.IsVisible = true;
+            if (PathSelectionRow != null) PathSelectionRow.IsVisible = true;
+            if (ProgressRow != null) ProgressRow.IsVisible = true;
+            if (VideoPlayerHeader != null) VideoPlayerHeader.IsVisible = true;
+            if (MainContentArea != null) MainContentArea.IsVisible = true;
+            if (StatusBar != null) StatusBar.IsVisible = true;
+
+            // Remove escape key handler
+            KeyDown -= OnFullscreenKeyDown;
+
+            // Reset the VideoPlayer's fullscreen state to keep them in sync
+            VideoPlayer?.ResetFullscreenState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to exit fullscreen mode", ex);
+        }
+    }
+
+    /// <summary>
+    /// Handle escape key in fullscreen mode
+    /// </summary>
+    private void OnFullscreenKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && _isInFullscreen)
+        {
+            ExitFullscreen();
+        }
     }
 
     /// <summary>

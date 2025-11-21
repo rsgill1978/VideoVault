@@ -454,6 +454,14 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
+    /// Reset fullscreen state (called by MainWindow to sync state)
+    /// </summary>
+    public void ResetFullscreenState()
+    {
+        _isFullscreen = false;
+    }
+
+    /// <summary>
     /// Update timer elapsed event
     /// </summary>
     private void UpdateTimer_Elapsed(object? sender, ElapsedEventArgs e)
