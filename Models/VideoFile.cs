@@ -112,6 +112,11 @@ public class VideoFile : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Path to the thumbnail image file
+    /// </summary>
+    public string ThumbnailPath { get; set; } = string.Empty;
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>

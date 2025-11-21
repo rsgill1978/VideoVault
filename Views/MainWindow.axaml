@@ -152,8 +152,25 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5">
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <StackPanel Grid.Column="0">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <!-- Thumbnail -->
+                                        <Border Grid.Column="0" Width="80" Height="60"
+                                               CornerRadius="3" Margin="0,0,10,0"
+                                               BorderBrush="Gray" BorderThickness="1"
+                                               Background="#F0F0F0">
+                                            <Panel>
+                                                <Image Source="{Binding ThumbnailPath}"
+                                                      Stretch="UniformToFill"
+                                                      IsVisible="{Binding ThumbnailPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                                <TextBlock Text="📹" FontSize="32"
+                                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          Foreground="Gray"
+                                                          IsVisible="{Binding ThumbnailPath, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                                            </Panel>
+                                        </Border>
+
+                                        <!-- Video Information -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding FileName}"
                                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">

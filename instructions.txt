@@ -53,12 +53,7 @@ Phase 2:
 COMPLETE
 
 Phase 3:
-Update build script to generate installers for each platform.
-If a DMG is generated for MacOS, no installer is required.
-EXE or MSI is required for Windows.
-DEB is required for Linux Mint.
-Thumbnail generation for imported files.
-Thumbnails must be displayed in addition to existing dislpayed information in the video library pane
+COMPLETE
 
 Phase 4:
 Web scraping.

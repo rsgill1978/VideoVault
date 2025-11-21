@@ -64,7 +64,8 @@ public class DatabaseService
                     Resolution TEXT DEFAULT '',
                     Extension TEXT NOT NULL,
                     IsDuplicate INTEGER DEFAULT 0,
-                    OriginalFileId INTEGER NULL
+                    OriginalFileId INTEGER NULL,
+                    ThumbnailPath TEXT DEFAULT ''
                 )";
 
             using var command = new SqliteCommand(createTableQuery, connection);
@@ -74,6 +75,20 @@ public class DatabaseService
             string createIndexQuery = "CREATE INDEX IF NOT EXISTS idx_filehash ON VideoFiles(FileHash)";
             using var indexCommand = new SqliteCommand(createIndexQuery, connection);
             indexCommand.ExecuteNonQuery();
+
+            // Add ThumbnailPath column if it doesn't exist (for migration from older schema)
+            try
+            {
+                string addColumnQuery = "ALTER TABLE VideoFiles ADD COLUMN ThumbnailPath TEXT DEFAULT ''";
+                using var addColumnCommand = new SqliteCommand(addColumnQuery, connection);
+                addColumnCommand.ExecuteNonQuery();
+                _logger.LogInfo("Added ThumbnailPath column to database");
+            }
+            catch (SqliteException ex) when (ex.Message.Contains("duplicate column"))
+            {
+                // Column already exists, this is expected
+                _logger.LogDebug("ThumbnailPath column already exists");
+            }
 
             _logger.LogInfo("Database initialized successfully");
         }
@@ -96,8 +111,8 @@ public class DatabaseService
 
         // Insert video file record
         string insertQuery = @"
-            INSERT INTO VideoFiles (FilePath, FileName, FileSize, FileHash, DateAdded, Duration, Resolution, Extension, IsDuplicate, OriginalFileId)
-            VALUES (@FilePath, @FileName, @FileSize, @FileHash, @DateAdded, @Duration, @Resolution, @Extension, @IsDuplicate, @OriginalFileId);
+            INSERT INTO VideoFiles (FilePath, FileName, FileSize, FileHash, DateAdded, Duration, Resolution, Extension, IsDuplicate, OriginalFileId, ThumbnailPath)
+            VALUES (@FilePath, @FileName, @FileSize, @FileHash, @DateAdded, @Duration, @Resolution, @Extension, @IsDuplicate, @OriginalFileId, @ThumbnailPath);
             SELECT last_insert_rowid();";
 
         using var command = new SqliteCommand(insertQuery, connection);
@@ -111,6 +126,7 @@ public class DatabaseService
         command.Parameters.AddWithValue("@Extension", video.Extension);
         command.Parameters.AddWithValue("@IsDuplicate", video.IsDuplicate ? 1 : 0);
         command.Parameters.AddWithValue("@OriginalFileId", video.OriginalFileId.HasValue ? video.OriginalFileId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@ThumbnailPath", video.ThumbnailPath ?? string.Empty);
 
         // Execute query and get the new ID
         var result = await command.ExecuteScalarAsync();
@@ -216,6 +232,23 @@ public class DatabaseService
     }
 
     /// <summary>
+    /// Update thumbnail path for a video file
+    /// </summary>
+    public async Task UpdateThumbnailPathAsync(int id, string thumbnailPath)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        string updateQuery = "UPDATE VideoFiles SET ThumbnailPath = @ThumbnailPath WHERE Id = @Id";
+
+        using var command = new SqliteCommand(updateQuery, connection);
+        command.Parameters.AddWithValue("@Id", id);
+        command.Parameters.AddWithValue("@ThumbnailPath", thumbnailPath ?? string.Empty);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
     /// Delete a video file from the database
     /// </summary>
     public async Task DeleteVideoAsync(int id)
@@ -249,7 +282,8 @@ public class DatabaseService
             Resolution = reader.GetString(7),
             Extension = reader.GetString(8),
             IsDuplicate = reader.GetInt32(9) == 1,
-            OriginalFileId = reader.IsDBNull(10) ? null : reader.GetInt32(10)
+            OriginalFileId = reader.IsDBNull(10) ? null : reader.GetInt32(10),
+            ThumbnailPath = reader.IsDBNull(11) ? string.Empty : reader.GetString(11)
         };
     }
 }

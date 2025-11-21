@@ -117,3 +117,12 @@ Icon
 # Project-specific
 # Ignore any generated manifests or configs if not committed
 # app.manifest is committed, so okay
+
+# Installers and packages
+installers/
+installers/**
+*.zip
+*.tar.gz
+*.deb
+*.dmg
+*.msi

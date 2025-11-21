@@ -21,6 +21,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
     private readonly DatabaseService _databaseService;
     private readonly FileScannerService _fileScannerService;
     private readonly DuplicateFinderService _duplicateFinderService;
+    private readonly ThumbnailService _thumbnailService;
     private readonly AppSettings _settings;
     private readonly LoggingService _logger;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -62,6 +63,9 @@ public class MainWindowViewModel : INotifyPropertyChanged
 
             _duplicateFinderService = new DuplicateFinderService(_databaseService);
             _logger.LogInfo("Duplicate finder service initialized");
+
+            _thumbnailService = new ThumbnailService();
+            _logger.LogInfo("Thumbnail service initialized");
 
             // Subscribe to scanner events
             _fileScannerService.ProgressChanged += OnScanProgressChanged;
@@ -316,10 +320,19 @@ public class MainWindowViewModel : INotifyPropertyChanged
             }
 
             _logger.LogInfo($"Scan complete: {added} added, {skipped} skipped");
-            ScanStatus = $"Scan complete. Added {added} new video files.";
-            
+
             // Reload videos from database to update UI
             await LoadVideosAsync();
+
+            // Generate thumbnails for new videos
+            if (added > 0)
+            {
+                ScanStatus = "Generating thumbnails...";
+                _logger.LogInfo("Generating thumbnails for new videos...");
+                await GenerateThumbnailsAsync(_cancellationTokenSource.Token);
+            }
+
+            ScanStatus = $"Scan complete. Added {added} new video files.";
         }
         catch (OperationCanceledException)
         {
@@ -463,6 +476,50 @@ public class MainWindowViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// Generate thumbnails for videos without thumbnails
+    /// </summary>
+    private async Task GenerateThumbnailsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var videosWithoutThumbnails = Videos.Where(v => string.IsNullOrEmpty(v.ThumbnailPath)).ToList();
+
+            if (videosWithoutThumbnails.Count == 0)
+            {
+                _logger.LogInfo("All videos already have thumbnails");
+                return;
+            }
+
+            _logger.LogInfo($"Generating thumbnails for {videosWithoutThumbnails.Count} videos...");
+            int generated = 0;
+
+            foreach (var video in videosWithoutThumbnails)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                ScanStatus = $"Generating thumbnail: {video.FileName}";
+
+                var thumbnailPath = await _thumbnailService.GenerateThumbnailAsync(video);
+
+                if (!string.IsNullOrEmpty(thumbnailPath))
+                {
+                    video.ThumbnailPath = thumbnailPath;
+                    await _databaseService.UpdateThumbnailPathAsync(video.Id, thumbnailPath);
+                    generated++;
+                    _logger.LogDebug($"Thumbnail generated for: {video.FileName}");
+                }
+            }
+
+            _logger.LogInfo($"Generated {generated} thumbnails");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error generating thumbnails", ex);
+        }
+    }
+
+    /// <summary>
     /// Load videos from database
     /// </summary>
     private async Task LoadVideosAsync()
@@ -473,7 +530,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
             var videos = await _databaseService.GetAllVideosAsync();
 
             _logger.LogDebug($"Retrieved {videos.Count} videos from database");
-            
+
             Videos.Clear();
             foreach (var video in videos)
             {
