@@ -10,9 +10,9 @@
         MinWidth="800" MinHeight="600">
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-        
+
         <!-- Menu Bar -->
-        <Menu Grid.Row="0">
+        <Menu Grid.Row="0" Name="MainMenu">
             <MenuItem Header="File">
                 <MenuItem Header="Settings" Click="SettingsButton_Click"
                          ToolTip.Tip="Open application settings">
@@ -53,7 +53,7 @@
         </Menu>
 
         <!-- Path Selection Row -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="10,10,10,0">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="10,10,10,0" Name="PathSelectionRow">
             <TextBlock Text="Video Path:" VerticalAlignment="Center" Width="80"/>
             <TextBox Text="{Binding VideoPath}" Width="500" VerticalAlignment="Center"
                      Watermark="Enter or browse to video directory"
@@ -71,7 +71,7 @@
         </StackPanel>
 
         <!-- Progress Bar Row -->
-        <Grid Grid.Row="2" RowDefinitions="Auto,Auto" Margin="10,10,10,10">
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto" Margin="10,10,10,10" Name="ProgressRow">
             <ProgressBar Grid.Row="0" Minimum="0" Maximum="{Binding ScanTotal}" 
                         Value="{Binding ScanProgress}" Height="25"
                         IsIndeterminate="{Binding IsScanning}"
@@ -88,14 +88,19 @@
             </Grid.RowDefinitions>
             
             <!-- Video Player Header with Collapse Button -->
-            <Border Grid.Row="0" Background="#E0E0E0" CornerRadius="5,5,0,0" Padding="10,5">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <TextBlock Grid.Column="0" Text="▼" FontSize="14" VerticalAlignment="Center" 
+            <Border Grid.Row="0" Background="#E0E0E0" CornerRadius="5,5,0,0" Padding="10,5" Name="VideoPlayerHeader">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <TextBlock Grid.Column="0" Text="▼" FontSize="14" VerticalAlignment="Center"
                               Margin="0,0,10,0" Name="VideoPlayerCollapseIcon"
                               ToolTip.Tip="Click to collapse/expand video player"/>
-                    <TextBlock Grid.Column="1" Text="Video Player" FontWeight="Bold" FontSize="16" 
+                    <TextBlock Grid.Column="1" Text="Video Player" FontWeight="Bold" FontSize="16"
                               VerticalAlignment="Center"/>
-                    <Button Grid.Column="2" Content="Collapse" Name="VideoPlayerCollapseButton" 
+                    <TextBlock Grid.Column="2" Name="CurrentVideoName" Text=""
+                              FontSize="14" VerticalAlignment="Center"
+                              HorizontalAlignment="Center" Foreground="#555555"
+                              FontStyle="Italic" TextTrimming="CharacterEllipsis"
+                              Margin="20,0,20,0"/>
+                    <Button Grid.Column="3" Content="Collapse" Name="VideoPlayerCollapseButton"
                            Click="VideoPlayerCollapse_Click"
                            ToolTip.Tip="Collapse video player to save space"/>
                 </Grid>
@@ -110,7 +115,7 @@
         </Grid>
 
         <!-- Main Content Area - Video Library and Duplicates -->
-        <Grid Grid.Row="4" Margin="10,0,10,0">
+        <Grid Grid.Row="4" Margin="10,0,10,0" Name="MainContentArea">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="200"/>
                 <ColumnDefinition Width="Auto"/>
@@ -132,18 +137,29 @@
                             SelectedItem="{Binding SelectedVideo}"
                             Background="White"
                             SelectionChanged="VideoList_SelectionChanged"
-                            ToolTip.Tip="List of video files in the catalog - Select to play">
+                            DoubleTapped="VideoList_DoubleTapped"
+                            Name="VideoListBox"
+                            ToolTip.Tip="List of video files in the catalog - Double-click to play or right-click for options">
+                        <ListBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Play Video" Click="PlayVideoMenuItem_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="▶" FontSize="14"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5">
                                     <Grid ColumnDefinitions="*,Auto">
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="{Binding FileName}" 
+                                            <TextBlock Text="{Binding FileName}"
                                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                             <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,2,0,0">
-                                                <TextBlock Text="{Binding FileSize, StringFormat='{}{0:N0} bytes'}" 
+                                                <TextBlock Text="{Binding FormattedFileSize}"
                                                           FontSize="11" Foreground="Gray"/>
-                                                <TextBlock Text="{Binding Extension}" 
+                                                <TextBlock Text="{Binding Extension}"
                                                           FontSize="11" Foreground="Gray"/>
                                             </StackPanel>
                                         </StackPanel>
@@ -189,17 +205,17 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Grid ColumnDefinitions="Auto,*,Auto" Margin="5,2">
-                                                            <CheckBox Grid.Column="0" 
+                                                            <CheckBox Grid.Column="0"
                                                                      IsChecked="{Binding IsMarkedForDeletion}"
                                                                      ToolTip.Tip="Mark for deletion"/>
-                                                            <TextBlock Grid.Column="1" 
-                                                                      Text="{Binding FileName}" 
-                                                                      FontSize="11" 
+                                                            <TextBlock Grid.Column="1"
+                                                                      Text="{Binding FileName}"
+                                                                      FontSize="11"
                                                                       Margin="5,0,5,0"
                                                                       TextWrapping="Wrap"
                                                                       ToolTip.Tip="{Binding FilePath}"/>
-                                                            <TextBlock Grid.Column="2" 
-                                                                      Text="{Binding FileSize, StringFormat='{}{0:N0}'}"
+                                                            <TextBlock Grid.Column="2"
+                                                                      Text="{Binding FormattedFileSize}"
                                                                       FontSize="10"
                                                                       Foreground="Gray"/>
                                                         </Grid>
@@ -224,7 +240,7 @@
         </Grid>
 
         <!-- Status Bar -->
-        <Border Grid.Row="5" Background="#F0F0F0" CornerRadius="3" Padding="5" Margin="10,10,10,10">
+        <Border Grid.Row="5" Background="#F0F0F0" CornerRadius="3" Padding="5" Margin="10,10,10,10" Name="StatusBar">
             <TextBlock Text="{Binding ScanStatus}" FontSize="12"/>
         </Border>
     </Grid>

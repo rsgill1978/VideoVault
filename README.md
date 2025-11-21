@@ -162,13 +162,21 @@ VideoVault is a cross-platform desktop application designed to catalog, organize
 
 | Control | Function |
 |---------|----------|
-| Play/Pause | Start or pause playback |
-| Progress Slider | Seek to specific time |
-| Volume Button | Mute/unmute |
-| Volume Slider | Adjust volume (0-100) |
-| Fullscreen Button | Toggle fullscreen |
-| Double-click | Toggle fullscreen |
-| ESC key | Exit fullscreen |
+| Play/Pause Button | Start or pause playback (shows ▶ when paused, ⏸ when playing) |
+| Progress Slider | Seek to specific time by dragging or clicking on the bar |
+| Time Display | Shows current position / total duration (HH:MM:SS format) |
+| Volume Button | Click to mute/unmute audio (icon changes: 🔇 muted, 🔉 low, 🔊 high) |
+| Volume Slider | Adjust volume from 0 (muted) to 100 (maximum) |
+| Fullscreen Button | Toggle fullscreen mode (⛶ icon) |
+| Double-click Video | Toggle fullscreen mode |
+| ESC key | Exit fullscreen mode |
+
+**Fullscreen Mode Features:**
+- Controls overlay the video at the bottom of the screen
+- Auto-hide after 3 seconds of inactivity
+- Move mouse to show controls again
+- Controls remain visible while mouse is over them
+- Semi-transparent dark background for better visibility
 
 ### Settings
 

@@ -1,6 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -26,17 +28,7 @@ public partial class MainWindow : Window
             _logger = LoggingService.Instance;
             
             InitializeComponent();
-            
-            // Add ESC key handler for exiting fullscreen
-            this.KeyDown += (s, e) =>
-            {
-                if (e.Key == Avalonia.Input.Key.Escape && this.WindowState == WindowState.FullScreen)
-                {
-                    ExitFullscreen();
-                    e.Handled = true;
-                }
-            };
-            
+
             // Initialize video player after the window is loaded
             this.Loaded += async (s, e) =>
             {
@@ -63,6 +55,7 @@ public partial class MainWindow : Window
                         }
                         
                         VideoPlayer.FullscreenToggled += OnFullscreenToggled;
+                        VideoPlayer.VideoStarted += OnVideoStarted;
                         _logger.LogInfo("Video player initialized successfully");
                     }
                     catch (Exception ex)
@@ -192,25 +185,52 @@ public partial class MainWindow : Window
     /// </summary>
     private void VideoList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        // Just update the selection - don't auto-load the video
+        // User must double-click or press play button to load and play
+        _logger.LogInfo($"Video selected: {ViewModel?.SelectedVideo?.FileName ?? "none"}");
+    }
+
+    /// <summary>
+    /// Handle video list double-click to load and play
+    /// </summary>
+    private void VideoList_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    {
+        PlaySelectedVideo();
+    }
+
+    /// <summary>
+    /// Handle context menu "Play Video" click
+    /// </summary>
+    private void PlayVideoMenuItem_Click(object? sender, RoutedEventArgs e)
+    {
+        PlaySelectedVideo();
+    }
+
+    /// <summary>
+    /// Play the currently selected video
+    /// </summary>
+    private void PlaySelectedVideo()
+    {
         if (ViewModel == null || ViewModel.SelectedVideo == null) return;
-        
+
         try
         {
             var filePath = ViewModel.SelectedVideo.FilePath;
-            
+
             // Check if file exists
             if (!File.Exists(filePath))
             {
                 _logger.LogWarning($"Selected video file not found: {filePath}");
                 return;
             }
-            
-            // Load selected video
-            VideoPlayer.LoadVideo(filePath);
+
+            // Load and play the selected video (will replace currently playing video if any)
+            VideoPlayer.LoadAndPlay(filePath);
+            _logger.LogInfo($"Now playing: {ViewModel.SelectedVideo.FileName}");
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to load selected video", ex);
+            _logger.LogError("Failed to load and play video", ex);
         }
     }
 
@@ -255,17 +275,42 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Handle video started event
+    /// </summary>
+    private void OnVideoStarted(string videoName)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (CurrentVideoName != null)
+            {
+                CurrentVideoName.Text = videoName;
+            }
+        });
+    }
+
+    private bool _isInFullscreen = false;
+
+    /// <summary>
     /// Handle fullscreen toggle
     /// </summary>
     private void OnFullscreenToggled(bool isFullscreen)
     {
-        if (isFullscreen)
+        try
         {
-            EnterFullscreen();
+            if (isFullscreen && !_isInFullscreen)
+            {
+                EnterFullscreen();
+            }
+            else if (!isFullscreen && _isInFullscreen)
+            {
+                ExitFullscreen();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            ExitFullscreen();
+            _logger.LogError("Error in OnFullscreenToggled", ex);
+            _isInFullscreen = false;
+            VideoPlayer?.ResetFullscreenState();
         }
     }
 
@@ -274,8 +319,103 @@ public partial class MainWindow : Window
     /// </summary>
     private void EnterFullscreen()
     {
-        _logger.LogDebug("Entering fullscreen mode");
-        this.WindowState = WindowState.FullScreen;
+        try
+        {
+            // Check if video is loaded
+            if (VideoPlayer == null || !VideoPlayer.IsVideoLoaded)
+            {
+                _logger.LogWarning("Cannot enter fullscreen: No video loaded");
+
+                // Reset the VideoPlayer's fullscreen state since we're not entering fullscreen
+                VideoPlayer?.ResetFullscreenState();
+
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    await ShowMessageBox("No Video", "Please load a video before entering fullscreen mode.");
+                });
+                return;
+            }
+
+            _isInFullscreen = true;
+
+            // Hide all UI except video player
+            if (MainMenu != null) MainMenu.IsVisible = false;
+            if (PathSelectionRow != null) PathSelectionRow.IsVisible = false;
+            if (ProgressRow != null) ProgressRow.IsVisible = false;
+            if (VideoPlayerHeader != null) VideoPlayerHeader.IsVisible = false;
+            if (MainContentArea != null) MainContentArea.IsVisible = false;
+            if (StatusBar != null) StatusBar.IsVisible = false;
+
+            // Expand video player to fill entire window
+            if (VideoPlayerRow != null)
+            {
+                VideoPlayerRow.SetValue(Grid.RowProperty, 0);
+                VideoPlayerRow.SetValue(Grid.RowSpanProperty, 6);
+                // Change the row definitions to make video player fill space
+                VideoPlayerRow.RowDefinitions.Clear();
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Star)); // Fill remaining space
+            }
+
+            // Hide video player content border and make player fill space
+            if (VideoPlayerContent != null)
+            {
+                VideoPlayerContent.BorderThickness = new Avalonia.Thickness(0);
+                VideoPlayerContent.Padding = new Avalonia.Thickness(0);
+                VideoPlayerContent.Background = Avalonia.Media.Brushes.Transparent; // Remove white background
+                VideoPlayerContent.SetValue(Grid.RowProperty, 0); // Move to first row
+            }
+
+            // Make window fullscreen first
+            WindowState = WindowState.FullScreen;
+
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Height = double.NaN; // Auto height to fill available space
+                VideoPlayer.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+            }
+
+            // Wait for layout to actually update with real bounds before enabling fullscreen mode
+            if (VideoPlayer != null)
+            {
+                // Subscribe to layout updated event to know when bounds are ready
+                EventHandler? layoutHandler = null;
+                layoutHandler = async (s, e) =>
+                {
+                    if (VideoPlayer != null && VideoPlayer.Bounds.Height > 100)
+                    {
+                        // Layout is now complete with real bounds
+                        VideoPlayer.LayoutUpdated -= layoutHandler;
+
+                        // Give a small delay for any final adjustments
+                        await Task.Delay(50);
+
+                        if (VideoPlayer != null)
+                        {
+                            _logger.LogInfo($"Layout complete, VideoPlayer bounds: {VideoPlayer.Bounds}");
+                            VideoPlayer.EnableFullscreenMode(true);
+                        }
+                    }
+                };
+
+                VideoPlayer.LayoutUpdated += layoutHandler;
+
+                // Force layout update
+                VideoPlayer.InvalidateMeasure();
+                VideoPlayer.InvalidateArrange();
+            }
+
+            // Add escape key handler
+            KeyDown += OnFullscreenKeyDown;
+
+            // Add pointer moved handler to the window for fullscreen control visibility
+            PointerMoved += OnFullscreenPointerMoved;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to enter fullscreen mode", ex);
+            _isInFullscreen = false;
+            VideoPlayer?.ResetFullscreenState();
+        }
     }
 
     /// <summary>
@@ -283,8 +423,99 @@ public partial class MainWindow : Window
     /// </summary>
     private void ExitFullscreen()
     {
-        _logger.LogDebug("Exiting fullscreen mode");
-        this.WindowState = WindowState.Normal;
+        if (!_isInFullscreen) return;
+
+        try
+        {
+            _isInFullscreen = false;
+
+            // Restore window state
+            WindowState = WindowState.Normal;
+
+            // Restore video player row position and definitions
+            if (VideoPlayerRow != null)
+            {
+                VideoPlayerRow.SetValue(Grid.RowProperty, 3);
+                VideoPlayerRow.SetValue(Grid.RowSpanProperty, 1);
+                // Restore original row definitions
+                VideoPlayerRow.RowDefinitions.Clear();
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Header
+                VideoPlayerRow.RowDefinitions.Add(new RowDefinition(GridLength.Auto)); // Content
+            }
+
+            // Restore video player content border
+            if (VideoPlayerContent != null)
+            {
+                VideoPlayerContent.BorderThickness = new Avalonia.Thickness(1);
+                VideoPlayerContent.Padding = new Avalonia.Thickness(5);
+                VideoPlayerContent.Background = Avalonia.Media.Brushes.White; // Restore white background
+                VideoPlayerContent.SetValue(Grid.RowProperty, 1); // Move back to second row
+            }
+
+            // Restore video player height
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Height = 400;
+                VideoPlayer.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
+                // Disable fullscreen mode
+                VideoPlayer.EnableFullscreenMode(false);
+            }
+
+            // Show all UI elements
+            if (MainMenu != null) MainMenu.IsVisible = true;
+            if (PathSelectionRow != null) PathSelectionRow.IsVisible = true;
+            if (ProgressRow != null) ProgressRow.IsVisible = true;
+            if (VideoPlayerHeader != null) VideoPlayerHeader.IsVisible = true;
+            if (MainContentArea != null) MainContentArea.IsVisible = true;
+            if (StatusBar != null) StatusBar.IsVisible = true;
+
+            // Remove escape key handler
+            KeyDown -= OnFullscreenKeyDown;
+
+            // Remove pointer moved handler
+            PointerMoved -= OnFullscreenPointerMoved;
+
+            // Reset the VideoPlayer's fullscreen state to keep them in sync
+            VideoPlayer?.ResetFullscreenState();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Failed to exit fullscreen mode", ex);
+        }
+    }
+
+    /// <summary>
+    /// Handle escape key in fullscreen mode
+    /// </summary>
+    private void OnFullscreenKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && _isInFullscreen)
+        {
+            ExitFullscreen();
+        }
+    }
+
+    /// <summary>
+    /// Handle pointer moved in fullscreen mode to show/hide controls
+    /// </summary>
+    private void OnFullscreenPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isInFullscreen || VideoPlayer == null) return;
+
+        // Forward the pointer moved event to the video player control
+        // This ensures controls show even when pointer is over the native VLC control
+        _logger.LogInfo("Fullscreen window pointer moved - showing controls");
+
+        // Trigger the video player's control visibility with auto-hide
+        // Use Invoke instead of Post to ensure it happens immediately
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            if (VideoPlayer != null)
+            {
+                _logger.LogInfo("Calling ShowControlsWithAutoHide");
+                VideoPlayer.ShowControlsWithAutoHide();
+            }
+        });
     }
 
     /// <summary>
@@ -369,9 +600,9 @@ public partial class MainWindow : Window
                         FontWeight = Avalonia.Media.FontWeight.Bold,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                     },
-                    new TextBlock 
-                    { 
-                        Text = "Version 1.0.0 - Phase 2", 
+                    new TextBlock
+                    {
+                        Text = "Version 1.0.0",
                         FontSize = 14,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                     },

@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:VideoVault.Controls"
+        x:Class="VideoVault.Views.FullscreenVideoWindow"
+        Title="VideoVault - Fullscreen"
+        WindowState="FullScreen"
+        Background="Black"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False">
+
+    <Panel Name="FullscreenPanel">
+        <!-- Video display area - fills entire window -->
+        <Border Background="Black" Name="VideoArea">
+            <!-- Video player control will be placed here -->
+        </Border>
+    </Panel>
+</Window>

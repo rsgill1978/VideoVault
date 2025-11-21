@@ -40,7 +40,6 @@ public class MainWindowViewModel : INotifyPropertyChanged
             // Initialize logging service
             _logger = LoggingService.Instance;
             _logger.LogInfo("=== VideoVault Application Starting ===");
-            _logger.LogInfo("Phase 2: Video Player Enabled");
 
             // Initialize services
             _settings = AppSettings.Load();
