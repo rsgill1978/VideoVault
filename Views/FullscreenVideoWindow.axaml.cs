@@ -43,7 +43,7 @@ public partial class FullscreenVideoWindow : Window
     }
 
     /// <summary>
-    /// Set the video player control
+    /// Set video player control for fullscreen display
     /// </summary>
     public void SetVideoPlayer(VideoPlayerControl player, string videoName)
     {
@@ -63,15 +63,12 @@ public partial class FullscreenVideoWindow : Window
             border.Child = player;
         }
 
-        _logger.LogInfo($"Fullscreen window pointer moved - showing controls");
-        _logger.LogInfo("Calling ShowControlsWithAutoHide");
-
-        // Tell the video player to show its controls
+        // Show controls initially
         player.ShowControlsWithAutoHide();
     }
 
     /// <summary>
-    /// Return the video player control
+    /// Return video player control to normal window
     /// </summary>
     public VideoPlayerControl? GetVideoPlayer()
     {
@@ -85,12 +82,10 @@ public partial class FullscreenVideoWindow : Window
     }
 
     /// <summary>
-    /// Handle pointer moved to show/hide controls
+    /// Show cursor when pointer moves
     /// </summary>
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        // VideoPlayerControl now handles its own controls display
-        // Just show cursor
         Cursor = new Cursor(StandardCursorType.Arrow);
     }
 

@@ -1,0 +1,71 @@
+I want to create an app to catalog and organize adult movie clips.
+Code for the app will be stored at https://github.com/rsgill1978/VideoVault.
+Code should be delivered via ZIP file (no need for README on how to use the ZIP file)
+Only changed files must be included in the ZIP file.
+Do not create any addition TXT or MD files explaining how to apply the code changes etc unless you are EXPLICITLY told to do so.
+
+The app must be C# and run on MacOS, Linux Mint and Windows.
+A Powershell build script must be included with the code.
+Always double check code before creating ZIP file.
+
+All code should contain comments.
+Not every line must be commented.
+Comments should be above lines of code, never on the same line (this improves readability).
+Comments should explain logic and how the logic is implemented.
+Comments must be in Simplified Technical English.
+
+The app must be fully documented.
+All UI elements must have tool tips.
+
+The app must be multi threaded.
+The UI must not be slugging or unresponsive while performing background tasks.
+
+NEVER REMOVE FUNCTIONALITY TO FIX A PROBLEM
+
+Features:
+All app features must be in one window.
+All app operations must be logged to a text file.
+Log detail levels must be configurable.
+Progress bars should be displayed for all operations which take time (especially background operations).
+Store all settings as a JSON.
+The app must have the ability to configure settings in the UI.
+App UI must be resizable and have the ability to be maximized, minimized etc.
+UI must allow for a path to video files to be browsed to.
+Once the scan button is clicked, all video files in the path must be scanned recursively.
+The files which are found must be cataloged in a database (database setup etc must be hidden from the end user).
+As files are added to the app's library, they must be visible within the app.
+An embedded video player must be available for playing videos within the app.
+The video player must have full screen ability and a "minimized" mode where the video is played in the bottom right corner of the app window.
+The app must have the ability to identify duplicate files based on a scoring system and have the ability to delete duplicate files.
+The app must auto generate thumbnails for all imported video files.
+The app must have the ability to scrape the web for missing information on the video files.
+There must be a way to edit the metadata of the files in the app.
+The app must be able to determine the performers in a video file.
+Once a performer has been identified, the performer must be added to the app's database.
+The performer's name, aliases, age (based on DOB), gender, body characteristics etc must be included.
+The acts being performed in each video should also be cataloged.
+The user should be able to search for files based on the acts performed, the performers, etc.
+
+Phase 1:
+COMPLETE
+
+Phase 2:
+COMPLETE
+
+Phase 3:
+Update build script to generate installers for each platform.
+If a DMG is generated for MacOS, no installer is required.
+EXE or MSI is required for Windows.
+DEB is required for Linux Mint.
+Thumbnail generation.
+
+Phase 4:
+Web scraping.
+Performer search.
+Determining acts being performed in the videos.
+
+Phase 5:
+Metadata editing
+
+Phase 6:
+Advanced search options.

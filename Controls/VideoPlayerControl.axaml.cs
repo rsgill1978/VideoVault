@@ -34,7 +34,6 @@ public partial class VideoPlayerControl : UserControl
     private string? _currentVideoName = null;
     private Timer? _controlsHideTimer;
     private bool _isInFullscreenMode = false;
-    private DateTime _lastControlsLogTime = DateTime.MinValue;
 
     /// <summary>
     /// Event fired when video starts playing
@@ -566,121 +565,66 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
-    /// Show controls and restart auto-hide timer (for fullscreen mode)
+    /// Show controls and start auto-hide timer
     /// </summary>
     public void ShowControlsWithAutoHide()
     {
-        if (!_isInFullscreenMode)
-        {
-            _logger.LogInfo("ShowControlsWithAutoHide called but not in fullscreen mode");
-            return;
-        }
+        if (!_isInFullscreenMode) return;
 
-        // Show fullscreen controls
         SetControlsVisibility(true);
 
-        // Log detailed info about fullscreen controls (once per second to avoid spam)
-        var now = DateTime.Now;
-        if ((now - _lastControlsLogTime).TotalSeconds >= 1.0)
-        {
-            _lastControlsLogTime = now;
-            if (FullscreenControlsCanvas != null)
-            {
-                _logger.LogInfo($"FullscreenControlsCanvas: IsVisible={FullscreenControlsCanvas.IsVisible}, Bounds={FullscreenControlsCanvas.Bounds}");
-            }
-            if (FullscreenControls != null)
-            {
-                _logger.LogInfo($"FullscreenControls Border: IsVisible={FullscreenControls.IsVisible}, Bounds={FullscreenControls.Bounds}");
-            }
-        }
-
-        // Restart auto-hide timer
         _controlsHideTimer?.Stop();
         _controlsHideTimer?.Start();
     }
 
     /// <summary>
-    /// Enable fullscreen mode with auto-hide controls
+    /// Enable or disable fullscreen mode
     /// </summary>
-    /// <param name="enable">True to enable fullscreen, false to disable</param>
     public void EnableFullscreenMode(bool enable)
     {
-        // Update fullscreen mode flag
         _isInFullscreenMode = enable;
 
         if (enable)
         {
-            // Log fullscreen activation
-            _logger.LogInfo($"Enabling fullscreen mode - VideoPlayerControl Bounds: {this.Bounds}");
-
             // Resize VLC window to leave space for controls at bottom
             if (_vlcHost != null && this.Bounds.Height > 0)
             {
                 double controlsHeight = 120;
                 double videoHeight = this.Bounds.Height - controlsHeight;
-                _logger.LogInfo($"Resizing VLC window: Total={this.Bounds.Height}, Video={videoHeight}, Controls={controlsHeight}");
                 _vlcHost.Height = videoHeight;
                 _vlcHost.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
             }
 
-            // Hide the entire normal layout (including controls)
-            if (NormalLayout != null)
+            // Hide normal mode controls
+            if (PlayerControls != null)
             {
-                // Keep video visible but hide the grid controls row
-                if (PlayerControls != null)
-                {
-                    PlayerControls.IsVisible = false;
-                }
+                PlayerControls.IsVisible = false;
             }
 
-            // Show fullscreen overlay canvas
+            // Show fullscreen overlay
             if (FullscreenControlsCanvas != null)
             {
                 FullscreenControlsCanvas.IsVisible = true;
-
-                // Force layout update on fullscreen controls canvas
                 FullscreenControlsCanvas.InvalidateMeasure();
                 FullscreenControlsCanvas.InvalidateArrange();
-
-                // Log fullscreen controls state
-                _logger.LogInfo($"Fullscreen controls canvas shown: IsVisible={FullscreenControlsCanvas.IsVisible}, Bounds={FullscreenControlsCanvas.Bounds}");
-
-                // Schedule logging after layout completes
-                Task.Delay(100).ContinueWith(_ =>
-                {
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        if (FullscreenControlsCanvas != null && FullscreenControls != null)
-                        {
-                            _logger.LogInfo($"Fullscreen canvas after layout: Bounds={FullscreenControlsCanvas.Bounds}");
-                            _logger.LogInfo($"Fullscreen controls after layout: Bounds={FullscreenControls.Bounds}, IsVisible={FullscreenControls.IsVisible}");
-                        }
-                    });
-                });
             }
 
-            // Sync UI state to fullscreen controls
+            // Copy current control states to fullscreen controls
             SyncControlsToFullscreen();
 
-            // Set transparent background for pointer event capture
+            // Enable pointer events for showing controls on mouse movement
             this.Background = Avalonia.Media.Brushes.Transparent;
-
-            // Attach pointer moved handler to show controls on mouse movement
             this.PointerMoved += OnPointerMovedInFullscreen;
 
-            // Attach handler to video container
             if (VideoContainer != null)
             {
                 VideoContainer.PointerMoved += OnPointerMovedInFullscreen;
             }
 
-            // Attach handlers to fullscreen controls canvas for auto-hide pause
+            // Pause auto-hide when mouse is over controls
             if (FullscreenControlsCanvas != null)
             {
-                // Stop auto-hide when mouse enters controls area
                 FullscreenControlsCanvas.PointerEntered += OnControlsPointerEntered;
-
-                // Restart auto-hide when mouse leaves controls area
                 FullscreenControlsCanvas.PointerExited += OnControlsPointerExited;
             }
 
@@ -690,9 +634,6 @@ public partial class VideoPlayerControl : UserControl
         }
         else
         {
-            // Log fullscreen exit
-            _logger.LogInfo("Disabling fullscreen mode");
-
             // Restore VLC window to full size
             if (_vlcHost != null)
             {
@@ -706,13 +647,13 @@ public partial class VideoPlayerControl : UserControl
                 PlayerControls.IsVisible = true;
             }
 
-            // Hide fullscreen overlay canvas
+            // Hide fullscreen overlay
             if (FullscreenControlsCanvas != null)
             {
                 FullscreenControlsCanvas.IsVisible = false;
             }
 
-            // Remove pointer moved handlers
+            // Remove pointer event handlers
             this.PointerMoved -= OnPointerMovedInFullscreen;
 
             if (VideoContainer != null)
@@ -720,39 +661,32 @@ public partial class VideoPlayerControl : UserControl
                 VideoContainer.PointerMoved -= OnPointerMovedInFullscreen;
             }
 
-            // Remove fullscreen controls canvas handlers
             if (FullscreenControlsCanvas != null)
             {
                 FullscreenControlsCanvas.PointerEntered -= OnControlsPointerEntered;
                 FullscreenControlsCanvas.PointerExited -= OnControlsPointerExited;
             }
 
-            // Remove transparent background
             this.Background = null;
-
-            // Stop auto-hide timer
             _controlsHideTimer?.Stop();
         }
     }
 
     /// <summary>
-    /// Sync normal controls state to fullscreen controls
+    /// Copy control states from normal mode to fullscreen mode
     /// </summary>
     private void SyncControlsToFullscreen()
     {
-        // Sync play/pause button icon
         if (FullscreenPlayPauseIcon != null && PlayPauseButton.Content is TextBlock normalIcon)
         {
             FullscreenPlayPauseIcon.Text = normalIcon.Text;
         }
 
-        // Sync progress slider value
         if (FullscreenProgressSlider != null && ProgressSlider != null)
         {
             FullscreenProgressSlider.Value = ProgressSlider.Value;
         }
 
-        // Sync time displays
         if (FullscreenTimeText != null && TimeText != null)
         {
             FullscreenTimeText.Text = TimeText.Text;
@@ -763,7 +697,6 @@ public partial class VideoPlayerControl : UserControl
             FullscreenDurationText.Text = DurationText.Text;
         }
 
-        // Sync volume controls
         if (FullscreenVolumeSlider != null && VolumeSlider != null)
         {
             FullscreenVolumeSlider.Value = VolumeSlider.Value;
@@ -776,51 +709,42 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
-    /// Handle pointer moved in fullscreen mode
+    /// Show controls when mouse moves in fullscreen
     /// </summary>
     private void OnPointerMovedInFullscreen(object? sender, PointerEventArgs e)
     {
         if (!_isInFullscreenMode) return;
 
-        _logger.LogDebug("Pointer moved in fullscreen - showing controls");
-
-        // Show controls
         Dispatcher.UIThread.Post(() =>
         {
             SetControlsVisibility(true);
-            _logger.LogDebug($"Controls visibility set to true, IsVisible: {PlayerControls?.IsVisible}");
         });
 
-        // Restart the hide timer
         _controlsHideTimer?.Stop();
         _controlsHideTimer?.Start();
     }
 
     /// <summary>
-    /// Handle pointer entered controls area
+    /// Stop auto-hide when mouse enters controls
     /// </summary>
     private void OnControlsPointerEntered(object? sender, PointerEventArgs e)
     {
         if (!_isInFullscreenMode) return;
-
-        // Stop the hide timer when mouse is over controls
         _controlsHideTimer?.Stop();
     }
 
     /// <summary>
-    /// Handle pointer exited controls area
+    /// Restart auto-hide when mouse leaves controls
     /// </summary>
     private void OnControlsPointerExited(object? sender, PointerEventArgs e)
     {
         if (!_isInFullscreenMode) return;
-
-        // Restart the hide timer when mouse leaves controls
         _controlsHideTimer?.Stop();
         _controlsHideTimer?.Start();
     }
 
     /// <summary>
-    /// Timer callback to hide controls
+    /// Hide controls after timer expires
     /// </summary>
     private void ControlsHideTimer_Elapsed(object? sender, ElapsedEventArgs e)
     {

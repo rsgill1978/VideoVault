@@ -1,20 +1,22 @@
 <!--
     VideoPlayerControl.axaml
 
-    This control provides a video player interface with playback controls.
-    The control uses LibVLC for video rendering via a NativeControlHost.
+    Video player control with LibVLC rendering and playback controls.
 
     Layout Structure:
-    - Outer Grid with 1 row containing entire control
-    - Inner Grid with 2 rows: video area (Row 0) and controls (Row 1)
-    - Overlay controls (Row 0 of outer grid) for fullscreen mode
+    - Panel contains two child elements
+    - Grid with video area and normal mode controls
+    - DockPanel with fullscreen overlay controls
 
-    Fullscreen Mode Behavior:
-    - Normal mode: Inner grid controls visible in Row 1, overlay hidden
-    - Fullscreen mode: Inner grid controls hidden, overlay controls visible and positioned over video
-    - Overlay controls have ZIndex=100 to render above video
-    - Controls have semi-transparent dark background for visibility
-    - Controls auto-hide after 3 seconds of inactivity
+    Normal Mode:
+    - Grid controls are visible at bottom
+    - DockPanel overlay is hidden
+
+    Fullscreen Mode:
+    - Grid controls are hidden
+    - DockPanel overlay is visible with controls docked to bottom
+    - Controls auto-hide after 3 seconds without mouse movement
+    - Semi-transparent background on controls for visibility
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -23,97 +25,81 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="VideoVault.Controls.VideoPlayerControl">
 
-    <!-- Outer panel that holds both the normal layout and fullscreen overlay -->
+    <!-- Container for normal and fullscreen layouts -->
     <Panel>
-        <!-- Inner grid with normal layout: video area and controls below -->
+        <!-- Normal mode layout -->
         <Grid RowDefinitions="*,Auto" Name="NormalLayout" ZIndex="0">
 
-            <!-- Video Display Area (Row 0) - Black panel containing the video renderer -->
-            <Panel Grid.Row="0" Background="Black" Name="VideoContainer"
-                   ToolTip.Tip="Video display area - Double-click to toggle fullscreen mode. Move mouse in fullscreen to show controls.">
+            <!-- Video display area -->
+            <Panel Grid.Row="0" Background="Black" Name="VideoContainer">
 
-                <!-- NativeControlHost for LibVLC video rendering - Stretches to fill entire video area -->
-                <!-- This is replaced at runtime with VlcNativeControlHost for proper Windows handle management -->
+                <!-- LibVLC video renderer -->
+                <!-- Replaced at runtime with VlcNativeControlHost -->
                 <NativeControlHost Name="VideoHost" IsVisible="True"
                                  HorizontalAlignment="Stretch"
-                                 VerticalAlignment="Stretch"
-                                 ToolTip.Tip="Video rendering surface"/>
+                                 VerticalAlignment="Stretch"/>
 
-                <!-- Placeholder text shown when no video is loaded -->
+                <!-- Shown when no video is loaded -->
                 <TextBlock Text="No video loaded"
                           Foreground="White"
                           HorizontalAlignment="Center"
                           VerticalAlignment="Center"
-                          Name="NoVideoText"
-                          ToolTip.Tip="Load a video to begin playback"/>
+                          Name="NoVideoText"/>
             </Panel>
 
-            <!-- Player Controls (Row 1) - Normal windowed mode controls -->
+            <!-- Normal mode controls at bottom -->
             <Border Grid.Row="1"
                     Background="#F0F0F0"
                     Padding="10"
-                    Name="PlayerControls"
-                    ToolTip.Tip="Video playback controls - Automatically hide in fullscreen after 3 seconds">
+                    Name="PlayerControls">
 
-                <!-- Control panel layout: 4 columns (play button, progress slider, volume controls, fullscreen button) -->
+                <!-- Play button, progress slider, volume, fullscreen button -->
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto">
 
-                    <!-- Play/Pause Button (Column 0) - Toggles between play and pause states -->
+                    <!-- Play/Pause button -->
                     <Button Grid.Column="0" Name="PlayPauseButton" Click="PlayPauseButton_Click"
-                           Width="40" Height="40" Margin="0,0,10,0"
-                           ToolTip.Tip="Click to play or pause the video. Shows ▶ when paused, ⏸ when playing.">
-                        <!-- Button icon text - Updated dynamically based on playback state -->
+                           Width="40" Height="40" Margin="0,0,10,0">
                         <TextBlock Text="▶" FontSize="20" HorizontalAlignment="Center"/>
                     </Button>
 
-                    <!-- Progress Slider and Time Display (Column 1) - Fills remaining space -->
+                    <!-- Progress slider and time display -->
                     <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
 
-                        <!-- Video progress slider - Range 0-100 representing 0%-100% of video duration -->
+                        <!-- Seek slider -->
                         <Slider Grid.Row="0" Name="ProgressSlider"
                                Minimum="0" Maximum="100"
-                               ValueChanged="ProgressSlider_ValueChanged"
-                               ToolTip.Tip="Drag to seek through the video. Click anywhere on the bar to jump to that position."/>
+                               ValueChanged="ProgressSlider_ValueChanged"/>
 
-                        <!-- Time display - Shows current time and total duration -->
+                        <!-- Current time and duration -->
                         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,5,0,0">
 
-                            <!-- Current playback time (left side) -->
                             <TextBlock Grid.Column="0" Name="TimeText" Text="00:00:00"
-                                     FontSize="11" VerticalAlignment="Center"
-                                     ToolTip.Tip="Current playback position"/>
+                                     FontSize="11" VerticalAlignment="Center"/>
 
-                            <!-- Total video duration (right side) -->
                             <TextBlock Grid.Column="2" Name="DurationText" Text="00:00:00"
-                                     FontSize="11" VerticalAlignment="Center"
-                                     ToolTip.Tip="Total video duration"/>
+                                     FontSize="11" VerticalAlignment="Center"/>
                         </Grid>
                     </Grid>
 
-                    <!-- Volume Control (Column 2) - Mute button and volume slider -->
+                    <!-- Volume controls -->
                     <Grid Grid.Column="2" ColumnDefinitions="Auto,Auto" Margin="10,0,10,0">
 
-                        <!-- Volume/Mute Button - Cycles through volume icons: 🔇 (muted), 🔉 (low), 🔊 (high) -->
+                        <!-- Mute button -->
                         <Button Grid.Column="0" Name="VolumeButton" Click="VolumeButton_Click"
-                               Width="40" Height="40"
-                               ToolTip.Tip="Click to mute or unmute audio. Icon changes based on volume level.">
-                            <!-- Volume icon - Updated dynamically based on volume level -->
+                               Width="40" Height="40">
                             <TextBlock Text="🔊" FontSize="16"/>
                         </Button>
 
-                        <!-- Volume slider - Range 0-100 representing volume percentage -->
+                        <!-- Volume slider -->
                         <Slider Grid.Column="1" Name="VolumeSlider"
                                Width="100" Minimum="0" Maximum="100" Value="100"
                                ValueChanged="VolumeSlider_ValueChanged"
-                               VerticalAlignment="Center"
-                               ToolTip.Tip="Adjust playback volume from 0 (muted) to 100 (maximum). Current value updates icon."/>
+                               VerticalAlignment="Center"/>
                     </Grid>
 
-                    <!-- Fullscreen Button (Column 3) - Toggles fullscreen mode -->
+                    <!-- Fullscreen button -->
                     <Button Grid.Column="3" Name="FullscreenButton" Click="FullscreenButton_Click"
-                           Width="40" Height="40"
-                           ToolTip.Tip="Toggle fullscreen mode. Press ESC or click this button again to exit fullscreen.">
-                        <!-- Fullscreen icon -->
+                           Width="40" Height="40">
                         <TextBlock Text="⛶" FontSize="20"/>
                     </Button>
 
@@ -122,9 +108,8 @@
 
         </Grid>
 
-        <!-- Fullscreen overlay controls - Hidden in normal mode, visible in fullscreen -->
-        <!-- DockPanel with controls docked to bottom - simple and works everywhere -->
-        <!-- ZIndex 100 ensures this renders above video and normal layout -->
+        <!-- Fullscreen overlay controls -->
+        <!-- Hidden in normal mode, visible in fullscreen -->
         <DockPanel Name="FullscreenControlsCanvas"
                    IsVisible="False"
                    ZIndex="100"
@@ -132,60 +117,51 @@
                    VerticalAlignment="Stretch"
                    LastChildFill="False">
 
-            <!-- Border docked to bottom -->
+            <!-- Controls docked to bottom with semi-transparent background -->
             <Border Name="FullscreenControls"
                     DockPanel.Dock="Bottom"
                     Background="#CC000000"
                     Padding="20"
-                    HorizontalAlignment="Stretch"
-                    ToolTip.Tip="Fullscreen playback controls - Move mouse to show, automatically hide after 3 seconds">
+                    HorizontalAlignment="Stretch">
 
-            <!-- Same control layout as normal mode -->
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
 
-                <!-- Play/Pause Button for fullscreen -->
+                <!-- Play/Pause button -->
                 <Button Grid.Column="0" Name="FullscreenPlayPauseButton" Click="PlayPauseButton_Click"
-                       Width="40" Height="40" Margin="0,0,10,0"
-                       ToolTip.Tip="Click to play or pause the video. Shows ▶ when paused, ⏸ when playing.">
+                       Width="40" Height="40" Margin="0,0,10,0">
                     <TextBlock Name="FullscreenPlayPauseIcon" Text="▶" FontSize="20" HorizontalAlignment="Center" Foreground="White"/>
                 </Button>
 
-                <!-- Progress Slider and Time Display for fullscreen -->
+                <!-- Progress slider and time display -->
                 <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
                     <Slider Grid.Row="0" Name="FullscreenProgressSlider"
                            Minimum="0" Maximum="100"
-                           ValueChanged="ProgressSlider_ValueChanged"
-                           ToolTip.Tip="Drag to seek through the video. Click anywhere on the bar to jump to that position."/>
+                           ValueChanged="ProgressSlider_ValueChanged"/>
 
                     <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,5,0,0">
                         <TextBlock Grid.Column="0" Name="FullscreenTimeText" Text="00:00:00"
-                                 FontSize="11" VerticalAlignment="Center" Foreground="White"
-                                 ToolTip.Tip="Current playback position"/>
+                                 FontSize="11" VerticalAlignment="Center" Foreground="White"/>
                         <TextBlock Grid.Column="2" Name="FullscreenDurationText" Text="00:00:00"
-                                 FontSize="11" VerticalAlignment="Center" Foreground="White"
-                                 ToolTip.Tip="Total video duration"/>
+                                 FontSize="11" VerticalAlignment="Center" Foreground="White"/>
                     </Grid>
                 </Grid>
 
-                <!-- Volume Control for fullscreen -->
+                <!-- Volume controls -->
                 <Grid Grid.Column="2" ColumnDefinitions="Auto,Auto" Margin="10,0,10,0">
                     <Button Grid.Column="0" Name="FullscreenVolumeButton" Click="VolumeButton_Click"
-                           Width="40" Height="40"
-                           ToolTip.Tip="Click to mute or unmute audio. Icon changes based on volume level.">
+                           Width="40" Height="40">
                         <TextBlock Name="FullscreenVolumeIcon" Text="🔊" FontSize="16" Foreground="White"/>
                     </Button>
 
                     <Slider Grid.Column="1" Name="FullscreenVolumeSlider"
                            Width="100" Minimum="0" Maximum="100" Value="100"
                            ValueChanged="VolumeSlider_ValueChanged"
-                           VerticalAlignment="Center"
-                           ToolTip.Tip="Adjust playback volume from 0 (muted) to 100 (maximum). Current value updates icon."/>
+                           VerticalAlignment="Center"/>
                 </Grid>
 
-                <!-- Fullscreen Button for fullscreen mode -->
+                <!-- Exit fullscreen button -->
                 <Button Grid.Column="3" Name="FullscreenExitButton" Click="FullscreenButton_Click"
-                       Width="40" Height="40"
-                       ToolTip.Tip="Exit fullscreen mode. You can also press ESC key.">
+                       Width="40" Height="40">
                     <TextBlock Text="⛶" FontSize="20" Foreground="White"/>
                 </Button>
 
