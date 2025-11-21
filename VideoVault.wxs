@@ -33,10 +33,6 @@
       <ComponentRef Id="ApplicationShortcut" />
     </Feature>
 
-    <!-- Application files will be generated via heat.exe harvest -->
-    <!-- This placeholder will be replaced during build -->
-    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER" />
-
     <!-- Start Menu shortcut component -->
     <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
       <Shortcut Id="ApplicationStartMenuShortcut"

@@ -171,32 +171,44 @@ function Create-WindowsInstaller {
                 New-Item -ItemType Directory -Path $WixObjDir -Force | Out-Null
             }
 
-            # Harvest files from build output directory
-            Write-Host "  Harvesting application files..." -ForegroundColor Cyan
+            # Generate file list from build output directory
+            Write-Host "  Generating component manifest from build files..." -ForegroundColor Cyan
 
-            & wix extension add WixToolset.Heat 2>&1 | Out-Null
+            # WiX v6 approach: manually generate components file
+            $files = Get-ChildItem -Path $BuildOutput -Recurse -File
 
-            # Use heat to harvest all files from the build output
-            $heatArgs = @(
-                "dir"
-                $BuildOutput
-                "-out"
-                $HarvestedWxs
-                "-cg"
-                "ApplicationFiles"
-                "-dr"
-                "INSTALLFOLDER"
-                "-gg"
-                "-sfrag"
-                "-srd"
-                "-ke"
-            )
+            $wxsContent = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+"@
 
-            & wix heat $heatArgs 2>&1 | Out-Null
+            $componentId = 1
+            foreach ($file in $files) {
+                $relativePath = $file.FullName.Substring($BuildOutput.Length + 1)
+                $fileId = "File$componentId"
+                $compId = "Component$componentId"
+                $compGuid = [guid]::NewGuid().ToString().ToUpper()
 
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "  WARNING: Heat harvesting had warnings, continuing..." -ForegroundColor Yellow
+                $wxsContent += @"
+
+      <Component Id="$compId" Guid="$compGuid">
+        <File Id="$fileId" Source="$($file.FullName)" KeyPath="yes" />
+      </Component>
+"@
+                $componentId++
             }
+
+            $wxsContent += @"
+
+    </ComponentGroup>
+  </Fragment>
+</Wix>
+"@
+
+            $wxsContent | Out-File -FilePath $HarvestedWxs -Encoding UTF8
+            Write-Host "  Generated $($files.Count) file components" -ForegroundColor Green
 
             # Build the MSI
             Write-Host "  Compiling MSI package..." -ForegroundColor Cyan
@@ -211,8 +223,6 @@ function Create-WindowsInstaller {
                 $HarvestedWxs
                 "-out"
                 $MsiPath
-                "-ext"
-                "WixToolset.Util.wixext"
             )
 
             & wix $buildArgs 2>&1 | ForEach-Object {
@@ -413,22 +423,65 @@ Description: Adult Video Catalog Application
 #!/bin/bash
 chmod +x /usr/local/bin/videovault/VideoVault
 "@
-    $PostInstScript | Out-File -FilePath (Join-Path $DebControlDir "postinst") -Encoding ASCII
+    $PostInstScript | Out-File -FilePath (Join-Path $DebControlDir "postinst") -Encoding ASCII -NoNewline
+
+    # Make postinst executable (set permission bits)
+    if ($IsLinux -or $IsMacOS) {
+        chmod +x (Join-Path $DebControlDir "postinst")
+    }
 
     Write-Host "DEB package structure created: $DebDir" -ForegroundColor Green
-    Write-Host "Note: To build DEB package, run on Linux: dpkg-deb --build $DebDir" -ForegroundColor Yellow
+
+    # Try to build DEB package
+    $DebPath = Join-Path $InstallerDir "videovault_1.0.0_amd64.deb"
+
+    if ($IsLinux) {
+        # On Linux, we can build the DEB directly
+        Write-Host "Building DEB package..." -ForegroundColor Yellow
+
+        try {
+            dpkg-deb --build $DebDir $DebPath 2>&1 | Out-Null
+
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $DebPath)) {
+                $debSize = (Get-Item $DebPath).Length / 1MB
+                Write-Host "DEB package created successfully!" -ForegroundColor Green
+                Write-Host "  File: $DebPath" -ForegroundColor Cyan
+                Write-Host "  Size: $($debSize.ToString('F2')) MB" -ForegroundColor Cyan
+            } else {
+                Write-Host "WARNING: DEB package creation failed" -ForegroundColor Yellow
+            }
+        }
+        catch {
+            Write-Host "WARNING: Failed to create DEB package: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "Note: DEB package can only be built on Linux. Use the DEB structure in: $DebDir" -ForegroundColor Yellow
+        Write-Host "On Linux, run: dpkg-deb --build $DebDir $DebPath" -ForegroundColor Cyan
+    }
 
     # Create tar.gz as cross-platform alternative
     Write-Host "Creating TAR.GZ package for Linux..." -ForegroundColor Yellow
     $TarPath = Join-Path $InstallerDir "VideoVault-Linux-x64.tar.gz"
+
     if ($IsLinux -or $IsMacOS) {
         tar -czf $TarPath -C $BuildOutput .
-        Write-Host "Linux package created: $TarPath" -ForegroundColor Green
+
+        if (Test-Path $TarPath) {
+            $tarSize = (Get-Item $TarPath).Length / 1MB
+            Write-Host "TAR.GZ package created: $TarPath" -ForegroundColor Green
+            Write-Host "  Size: $($tarSize.ToString('F2')) MB" -ForegroundColor Cyan
+        }
     } else {
-        # On Windows, create ZIP instead
+        # On Windows, tar might not be available, create ZIP instead
         $ZipPath = Join-Path $InstallerDir "VideoVault-Linux-x64.zip"
         Compress-Archive -Path "$BuildOutput\*" -DestinationPath $ZipPath -Force
-        Write-Host "Linux package created: $ZipPath" -ForegroundColor Green
+
+        if (Test-Path $ZipPath) {
+            $zipSize = (Get-Item $ZipPath).Length / 1MB
+            Write-Host "ZIP package created (Windows fallback): $ZipPath" -ForegroundColor Green
+            Write-Host "  Size: $($zipSize.ToString('F2')) MB" -ForegroundColor Cyan
+            Write-Host "  Note: On Linux/macOS, TAR.GZ will be created instead" -ForegroundColor Yellow
+        }
     }
 
     Write-Host ""
