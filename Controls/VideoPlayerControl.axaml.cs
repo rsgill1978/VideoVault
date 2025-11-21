@@ -23,6 +23,7 @@ public partial class VideoPlayerControl : UserControl
     private bool _isTimerUpdatingSlider = false;
     private bool _isMuted = false;
     private int _volumeBeforeMute = 100;
+    private bool _isUpdatingVolume = false;
     private bool _isFullscreen = false;
     private readonly LoggingService _logger;
     private IntPtr _videoHandle = IntPtr.Zero;
@@ -402,11 +403,33 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void VolumeSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
+        // Prevent feedback loops when syncing sliders
+        if (_isUpdatingVolume) return;
+
         if (_playerService != null)
         {
             int volume = (int)e.NewValue;
             _playerService.SetVolume(volume);
-            UpdateVolumeButton();
+
+            // Sync the other slider
+            _isUpdatingVolume = true;
+            try
+            {
+                if (sender == VolumeSlider && FullscreenVolumeSlider != null)
+                {
+                    FullscreenVolumeSlider.Value = volume;
+                }
+                else if (sender == FullscreenVolumeSlider && VolumeSlider != null)
+                {
+                    VolumeSlider.Value = volume;
+                }
+
+                UpdateVolumeButton();
+            }
+            finally
+            {
+                _isUpdatingVolume = false;
+            }
         }
     }
 
@@ -420,23 +443,39 @@ public partial class VideoPlayerControl : UserControl
             return;
         }
 
-        if (_isMuted)
+        _isUpdatingVolume = true;
+        try
         {
-            // Unmute
-            _isMuted = false;
-            _playerService.SetVolume(_volumeBeforeMute);
-            VolumeSlider.Value = _volumeBeforeMute;
-        }
-        else
-        {
-            // Mute
-            _volumeBeforeMute = _playerService.GetVolume();
-            _isMuted = true;
-            _playerService.SetVolume(0);
-            VolumeSlider.Value = 0;
-        }
+            if (_isMuted)
+            {
+                // Unmute
+                _isMuted = false;
+                _playerService.SetVolume(_volumeBeforeMute);
+                VolumeSlider.Value = _volumeBeforeMute;
+                if (FullscreenVolumeSlider != null)
+                {
+                    FullscreenVolumeSlider.Value = _volumeBeforeMute;
+                }
+            }
+            else
+            {
+                // Mute
+                _volumeBeforeMute = _playerService.GetVolume();
+                _isMuted = true;
+                _playerService.SetVolume(0);
+                VolumeSlider.Value = 0;
+                if (FullscreenVolumeSlider != null)
+                {
+                    FullscreenVolumeSlider.Value = 0;
+                }
+            }
 
-        UpdateVolumeButton();
+            UpdateVolumeButton();
+        }
+        finally
+        {
+            _isUpdatingVolume = false;
+        }
     }
 
     /// <summary>
