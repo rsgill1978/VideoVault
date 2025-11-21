@@ -1,8 +1,10 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Timers;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Platform;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -24,103 +26,59 @@ public partial class VideoPlayerControl : UserControl
     private readonly LoggingService _logger;
     private IntPtr _videoHandle = IntPtr.Zero;
     private bool _handleReady = false;
+    private VlcNativeControlHost? _vlcHost;
 
     public VideoPlayerControl()
     {
         InitializeComponent();
-        
+
         _logger = LoggingService.Instance;
-        
+
         // Set up update timer for UI updates
         _updateTimer = new Timer(100);
         _updateTimer.Elapsed += UpdateTimer_Elapsed;
-        
+
         // Add double-click handler for fullscreen
         if (VideoContainer != null)
         {
             VideoContainer.DoubleTapped += VideoContainer_DoubleTapped;
         }
 
-        // Subscribe to events to get handle when ready
+        // Replace the NativeControlHost with our custom VLC host
         if (VideoHost != null)
         {
-            // Try multiple events to catch when handle becomes available
-            VideoHost.Initialized += OnVideoHostInitialized;
-            VideoHost.Loaded += OnVideoHostLoaded;
-            VideoHost.AttachedToVisualTree += OnVideoHostAttached;
-        }
-    }
-
-    /// <summary>
-    /// Handle when VideoHost is initialized
-    /// </summary>
-    private void OnVideoHostInitialized(object? sender, EventArgs e)
-    {
-        TryGetHandle("Initialized");
-    }
-
-    /// <summary>
-    /// Handle when VideoHost is loaded
-    /// </summary>
-    private void OnVideoHostLoaded(object? sender, RoutedEventArgs e)
-    {
-        TryGetHandle("Loaded");
-    }
-
-    /// <summary>
-    /// Handle when VideoHost is attached to visual tree
-    /// </summary>
-    private void OnVideoHostAttached(object? sender, VisualTreeAttachmentEventArgs e)
-    {
-        TryGetHandle("AttachedToVisualTree");
-    }
-
-    /// <summary>
-    /// Try to get the native window handle
-    /// </summary>
-    private void TryGetHandle(string eventName)
-    {
-        if (_handleReady || VideoHost == null)
-        {
-            return;
-        }
-
-        try
-        {
-            // NativeControlHost has IPlatformHandle property
-            var platformHandle = VideoHost.PlatformHandle;
-            
-            if (platformHandle != null)
+            _vlcHost = new VlcNativeControlHost();
+            var parent = VideoHost.Parent;
+            if (parent is Panel panel)
             {
-                _videoHandle = platformHandle.Handle;
-                
-                if (_videoHandle != IntPtr.Zero)
-                {
-                    _handleReady = true;
-                    _logger.LogInfo($"Video handle obtained in {eventName}: {_videoHandle}");
-                    
-                    // If player service already exists, set the handle now
-                    if (_playerService?.MediaPlayer != null)
-                    {
-                        _playerService.MediaPlayer.Hwnd = _videoHandle;
-                        _logger.LogInfo("Handle set on existing MediaPlayer");
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning($"Handle is zero in {eventName}");
-                }
+                var index = panel.Children.IndexOf(VideoHost);
+                panel.Children.RemoveAt(index);
+                panel.Children.Insert(index, _vlcHost);
+                _vlcHost.Name = "VideoHost";
+                _vlcHost.IsVisible = true;
             }
-            else
-            {
-                _logger.LogWarning($"PlatformHandle is null in {eventName}");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error getting handle in {eventName}", ex);
+
+            _vlcHost.HandleCreated += OnHandleCreated;
         }
     }
+
+    /// <summary>
+    /// Handle when native control handle is created
+    /// </summary>
+    private void OnHandleCreated(IntPtr handle)
+    {
+        _videoHandle = handle;
+        _handleReady = true;
+        _logger.LogInfo($"Native control handle created: {_videoHandle}");
+
+        // If player service already exists, set the handle now
+        if (_playerService?.MediaPlayer != null)
+        {
+            _playerService.MediaPlayer.Hwnd = _videoHandle;
+            _logger.LogInfo("Handle set on existing MediaPlayer");
+        }
+    }
+
 
     /// <summary>
     /// Event fired when fullscreen is toggled
@@ -140,13 +98,7 @@ public partial class VideoPlayerControl : UserControl
         try
         {
             _logger.LogInfo("Initializing video player service");
-            
-            // Try to get handle if we don't have it yet
-            if (!_handleReady)
-            {
-                TryGetHandle("InitializePlayer");
-            }
-            
+
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
 
@@ -193,12 +145,6 @@ public partial class VideoPlayerControl : UserControl
             {
                 _logger.LogError("Player service null");
                 return;
-            }
-
-            // Try to get handle if we still don't have it
-            if (!_handleReady)
-            {
-                TryGetHandle("LoadVideo");
             }
 
             // Ensure handle is set before loading media
@@ -250,12 +196,6 @@ public partial class VideoPlayerControl : UserControl
         {
             _logger.LogError("No video loaded");
             return;
-        }
-
-        // Try one more time to get handle if we don't have it
-        if (!_handleReady)
-        {
-            TryGetHandle("PlayButton");
         }
 
         // Verify handle is set before playing
@@ -449,16 +389,83 @@ public partial class VideoPlayerControl : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        
-        if (VideoHost != null)
+
+        if (_vlcHost != null)
         {
-            VideoHost.Initialized -= OnVideoHostInitialized;
-            VideoHost.Loaded -= OnVideoHostLoaded;
-            VideoHost.AttachedToVisualTree -= OnVideoHostAttached;
+            _vlcHost.HandleCreated -= OnHandleCreated;
         }
-        
+
         _updateTimer?.Stop();
         _updateTimer?.Dispose();
         _playerService?.Dispose();
+    }
+}
+
+/// <summary>
+/// Custom NativeControlHost for VLC video rendering
+/// </summary>
+public class VlcNativeControlHost : NativeControlHost
+{
+    public event Action<IntPtr>? HandleCreated;
+
+    protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
+    {
+        var handle = base.CreateNativeControlCore(parent);
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            // On Windows, create a child window for VLC
+            var hwnd = CreateWindowForVlc(parent.Handle);
+            HandleCreated?.Invoke(hwnd);
+            return new PlatformHandle(hwnd, "HWND");
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            // On Linux, use the X11 handle
+            HandleCreated?.Invoke(handle.Handle);
+            return handle;
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            // On macOS, use the NSView handle
+            HandleCreated?.Invoke(handle.Handle);
+            return handle;
+        }
+
+        HandleCreated?.Invoke(handle.Handle);
+        return handle;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CreateWindowEx(
+        uint dwExStyle,
+        string lpClassName,
+        string lpWindowName,
+        uint dwStyle,
+        int x, int y, int nWidth, int nHeight,
+        IntPtr hWndParent,
+        IntPtr hMenu,
+        IntPtr hInstance,
+        IntPtr lpParam);
+
+    private const uint WS_CHILD = 0x40000000;
+    private const uint WS_VISIBLE = 0x10000000;
+    private const uint WS_CLIPCHILDREN = 0x02000000;
+    private const uint WS_CLIPSIBLINGS = 0x04000000;
+
+    private IntPtr CreateWindowForVlc(IntPtr parent)
+    {
+        var hwnd = CreateWindowEx(
+            0,
+            "Static",
+            "",
+            WS_CHILD | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+            0, 0, 100, 100,
+            parent,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero);
+
+        return hwnd;
     }
 }
