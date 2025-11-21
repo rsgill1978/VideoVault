@@ -33,6 +33,7 @@ public partial class VideoPlayerControl : UserControl
     private string? _currentVideoName = null;
     private Timer? _controlsHideTimer;
     private bool _isInFullscreenMode = false;
+    private DateTime _lastControlsLogTime = DateTime.MinValue;
 
     /// <summary>
     /// Event fired when video starts playing
@@ -493,11 +494,20 @@ public partial class VideoPlayerControl : UserControl
             return;
         }
 
-        _logger.LogInfo("ShowControlsWithAutoHide called - setting controls visible");
-
         SetControlsVisibility(true);
 
-        _logger.LogInfo($"Controls visibility set, PlayerControls != null: {PlayerControls != null}");
+        // Log detailed info about controls (but only once per second to avoid spam)
+        var now = DateTime.Now;
+        if ((now - _lastControlsLogTime).TotalSeconds >= 1.0)
+        {
+            _lastControlsLogTime = now;
+            if (PlayerControls != null)
+            {
+                _logger.LogInfo($"PlayerControls: IsVisible={PlayerControls.IsVisible}, Bounds={PlayerControls.Bounds}, " +
+                               $"ZIndex={PlayerControls.ZIndex}, GridRow={PlayerControls.GetValue(Grid.RowProperty)}, " +
+                               $"VerticalAlignment={PlayerControls.VerticalAlignment}");
+            }
+        }
 
         // Restart the hide timer
         _controlsHideTimer?.Stop();
@@ -565,19 +575,45 @@ public partial class VideoPlayerControl : UserControl
             }
 
             // Move controls to overlay position (Grid.Row=0 with VerticalAlignment=Bottom)
+            // Use negative margin to pull controls up over the video
             if (PlayerControls != null)
             {
                 PlayerControls.SetValue(Grid.RowProperty, 0);
+                PlayerControls.SetValue(Grid.RowSpanProperty, 2); // Span both rows to be able to position at bottom
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
                 PlayerControls.ZIndex = 100; // Ensure controls are above video
 
                 // Make controls semi-transparent for fullscreen
                 PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
                     Avalonia.Media.Color.FromArgb(200, 40, 40, 40)); // Semi-transparent dark background
+
+                _logger.LogInfo($"PlayerControls configured for fullscreen: Bounds={PlayerControls.Bounds}, " +
+                               $"IsVisible={PlayerControls.IsVisible}, ZIndex={PlayerControls.ZIndex}, " +
+                               $"GridRow={PlayerControls.GetValue(Grid.RowProperty)}, RowSpan={PlayerControls.GetValue(Grid.RowSpanProperty)}, " +
+                               $"VerticalAlignment={PlayerControls.VerticalAlignment}");
             }
 
             // Initially show controls in fullscreen (they will auto-hide after 3 seconds)
             SetControlsVisibility(true);
+
+            // Force layout update on controls
+            if (PlayerControls != null)
+            {
+                PlayerControls.InvalidateMeasure();
+                PlayerControls.InvalidateArrange();
+
+                // Log after invalidation
+                Task.Delay(100).ContinueWith(_ =>
+                {
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (PlayerControls != null)
+                        {
+                            _logger.LogInfo($"PlayerControls after layout update: Bounds={PlayerControls.Bounds}, IsVisible={PlayerControls.IsVisible}");
+                        }
+                    });
+                });
+            }
 
             // Ensure the control can capture pointer events by setting a transparent background
             this.Background = Avalonia.Media.Brushes.Transparent;
@@ -610,6 +646,7 @@ public partial class VideoPlayerControl : UserControl
             if (PlayerControls != null)
             {
                 PlayerControls.SetValue(Grid.RowProperty, 1);
+                PlayerControls.SetValue(Grid.RowSpanProperty, 1); // Reset row span
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
                 PlayerControls.ZIndex = 0;
 
