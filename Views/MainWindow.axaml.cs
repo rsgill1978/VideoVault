@@ -504,7 +504,7 @@ public partial class MainWindow : Window
 
         // Forward the pointer moved event to the video player control
         // This ensures controls show even when pointer is over the native VLC control
-        _logger.LogDebug("Fullscreen window pointer moved - showing controls");
+        _logger.LogInfo("Fullscreen window pointer moved - showing controls");
 
         // Trigger the video player's control visibility with auto-hide
         // Use Invoke instead of Post to ensure it happens immediately
@@ -512,6 +512,7 @@ public partial class MainWindow : Window
         {
             if (VideoPlayer != null)
             {
+                _logger.LogInfo("Calling ShowControlsWithAutoHide");
                 VideoPlayer.ShowControlsWithAutoHide();
             }
         });

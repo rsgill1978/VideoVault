@@ -487,11 +487,17 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     public void ShowControlsWithAutoHide()
     {
-        if (!_isInFullscreenMode) return;
+        if (!_isInFullscreenMode)
+        {
+            _logger.LogInfo("ShowControlsWithAutoHide called but not in fullscreen mode");
+            return;
+        }
 
-        _logger.LogDebug("ShowControlsWithAutoHide called");
+        _logger.LogInfo("ShowControlsWithAutoHide called - setting controls visible");
 
         SetControlsVisibility(true);
+
+        _logger.LogInfo($"Controls visibility set, PlayerControls != null: {PlayerControls != null}");
 
         // Restart the hide timer
         _controlsHideTimer?.Stop();
