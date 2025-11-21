@@ -574,10 +574,24 @@ public partial class VideoPlayerControl : UserControl
             // Log fullscreen activation
             _logger.LogInfo($"Enabling fullscreen mode - VideoPlayerControl Bounds: {this.Bounds}");
 
-            // Hide normal controls
-            if (PlayerControls != null)
+            // Resize VLC window to leave space for controls at bottom
+            if (_vlcHost != null && this.Bounds.Height > 0)
             {
-                PlayerControls.IsVisible = false;
+                double controlsHeight = 120;
+                double videoHeight = this.Bounds.Height - controlsHeight;
+                _logger.LogInfo($"Resizing VLC window: Total={this.Bounds.Height}, Video={videoHeight}, Controls={controlsHeight}");
+                _vlcHost.Height = videoHeight;
+                _vlcHost.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
+            }
+
+            // Hide the entire normal layout (including controls)
+            if (NormalLayout != null)
+            {
+                // Keep video visible but hide the grid controls row
+                if (PlayerControls != null)
+                {
+                    PlayerControls.IsVisible = false;
+                }
             }
 
             // Show fullscreen overlay canvas
@@ -639,6 +653,13 @@ public partial class VideoPlayerControl : UserControl
         {
             // Log fullscreen exit
             _logger.LogInfo("Disabling fullscreen mode");
+
+            // Restore VLC window to full size
+            if (_vlcHost != null)
+            {
+                _vlcHost.Height = double.NaN;
+                _vlcHost.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+            }
 
             // Show normal controls
             if (PlayerControls != null)

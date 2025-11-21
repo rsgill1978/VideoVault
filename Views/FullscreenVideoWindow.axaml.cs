@@ -20,22 +20,11 @@ public partial class FullscreenVideoWindow : Window
         InitializeComponent();
         _logger = LoggingService.Instance;
 
-        // Set up timer to hide controls after mouse stops moving
+        // Set up timer - not needed as VideoPlayerControl handles its own controls
         _hideControlsTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(3)
         };
-        _hideControlsTimer.Tick += (s, e) =>
-        {
-            if (ControlsOverlay != null)
-            {
-                ControlsOverlay.IsVisible = false;
-            }
-            _hideControlsTimer.Stop();
-        };
-
-        // Add mouse move handler to show controls
-        this.PointerMoved += OnPointerMoved;
 
         // Add key handler for ESC
         this.KeyDown += (s, e) =>
@@ -74,11 +63,11 @@ public partial class FullscreenVideoWindow : Window
             border.Child = player;
         }
 
-        // Set video title
-        if (VideoTitle != null)
-        {
-            VideoTitle.Text = videoName;
-        }
+        _logger.LogInfo($"Fullscreen window pointer moved - showing controls");
+        _logger.LogInfo("Calling ShowControlsWithAutoHide");
+
+        // Tell the video player to show its controls
+        player.ShowControlsWithAutoHide();
     }
 
     /// <summary>
@@ -100,17 +89,8 @@ public partial class FullscreenVideoWindow : Window
     /// </summary>
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
-        // Show controls
-        if (ControlsOverlay != null)
-        {
-            ControlsOverlay.IsVisible = true;
-        }
-
-        // Reset hide timer
-        _hideControlsTimer.Stop();
-        _hideControlsTimer.Start();
-
-        // Show cursor
+        // VideoPlayerControl now handles its own controls display
+        // Just show cursor
         Cursor = new Cursor(StandardCursorType.Arrow);
     }
 

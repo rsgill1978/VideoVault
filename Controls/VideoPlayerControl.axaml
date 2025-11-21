@@ -123,7 +123,7 @@
         </Grid>
 
         <!-- Fullscreen overlay controls - Hidden in normal mode, visible in fullscreen -->
-        <!-- DockPanel allows positioning at bottom while filling width -->
+        <!-- DockPanel with controls docked to bottom - simple and works everywhere -->
         <!-- ZIndex 100 ensures this renders above video and normal layout -->
         <DockPanel Name="FullscreenControlsCanvas"
                    IsVisible="False"
@@ -135,9 +135,9 @@
             <!-- Border docked to bottom -->
             <Border Name="FullscreenControls"
                     DockPanel.Dock="Bottom"
-                    Margin="0,0,0,10"
-                    Background="#C8282828"
-                    Padding="10"
+                    Background="#CC000000"
+                    Padding="20"
+                    HorizontalAlignment="Stretch"
                     ToolTip.Tip="Fullscreen playback controls - Move mouse to show, automatically hide after 3 seconds">
 
             <!-- Same control layout as normal mode -->
@@ -190,7 +190,7 @@
                 </Button>
 
             </Grid>
-        </Border>
+            </Border>
 
         </DockPanel>
 

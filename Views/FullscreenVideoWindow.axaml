@@ -8,39 +8,10 @@
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False">
 
-    <Grid Name="FullscreenGrid">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- Video display area -->
-        <Border Grid.Row="0" Background="Black" Name="VideoArea">
+    <Panel Name="FullscreenPanel">
+        <!-- Video display area - fills entire window -->
+        <Border Background="Black" Name="VideoArea">
             <!-- Video player control will be placed here -->
         </Border>
-
-        <!-- Controls overlay (hidden by default, shown on mouse move) -->
-        <Border Grid.Row="1"
-                Background="#CC000000"
-                Padding="10"
-                Name="ControlsOverlay"
-                IsVisible="False">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-                <TextBlock Grid.Column="0"
-                          Name="VideoTitle"
-                          Text=""
-                          Foreground="White"
-                          FontSize="16"
-                          FontWeight="Bold"
-                          VerticalAlignment="Center"
-                          Margin="0,0,20,0"/>
-
-                <TextBlock Grid.Column="2"
-                          Text="Press ESC or double-click to exit fullscreen"
-                          Foreground="White"
-                          FontSize="12"
-                          VerticalAlignment="Center"/>
-            </Grid>
-        </Border>
-    </Grid>
+    </Panel>
 </Window>
