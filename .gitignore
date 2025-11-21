@@ -121,6 +121,9 @@ Icon
 # Claude Code
 .claude/
 
+# Continue Code
+.continue/
+
 # Installers and packages
 installers/
 installers/**
