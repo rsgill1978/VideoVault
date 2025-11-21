@@ -1,5 +1,6 @@
-using Avalonia;
 using System;
+using Avalonia;
+using Avalonia.Skia;  // Add this using directive
 
 namespace VideoVault;
 
@@ -33,6 +34,8 @@ class Program
         return AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
+            .UseSkia()  // Enable Skia
+            .WithSkiaOptions(new SkiaOptions { Backend = SkiaOptions.BackendType.OpenGl })  // Force OpenGL backend
             .LogToTrace();
     }
 }

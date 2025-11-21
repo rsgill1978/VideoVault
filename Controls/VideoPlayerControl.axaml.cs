@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Timers;
 using Avalonia;
@@ -6,8 +7,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform;
 using Avalonia.Threading;
+using Avalonia.Media.Imaging;
+using Avalonia.Media;
+using Avalonia.Platform;  // For PixelFormat, AlphaFormat
 using LibVLCSharp.Shared;
 using VideoVault.Services;
 
@@ -22,8 +25,36 @@ public partial class VideoPlayerControl : UserControl
     private int _volumeBeforeMute = 100;
     private bool _isFullscreen = false;
     private readonly LoggingService _logger;
-    private IntPtr _videoHandle = IntPtr.Zero;
-    private bool _handleReady = false;
+    private WriteableBitmap? _videoBitmap;
+    private IntPtr _videoBuffer = IntPtr.Zero;
+    private int _videoWidth;
+    private int _videoHeight;
+    private VideoRenderControl VideoHost;
+
+    // Custom control for video rendering
+    private class VideoRenderControl : Control
+    {
+        private WriteableBitmap? _bitmap;
+        private int _width;
+        private int _height;
+
+        public void SetBitmap(WriteableBitmap? bitmap, int width, int height)
+        {
+            _bitmap = bitmap;
+            _width = width;
+            _height = height;
+            InvalidateVisual();
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            base.Render(context);
+            if (_bitmap != null)
+            {
+                context.DrawImage(_bitmap, new Rect(0, 0, _width, _height));
+            }
+        }
+    }
 
     public VideoPlayerControl()
     {
@@ -41,14 +72,9 @@ public partial class VideoPlayerControl : UserControl
             VideoContainer.DoubleTapped += VideoContainer_DoubleTapped;
         }
 
-        // Subscribe to events to get handle when ready
-        if (VideoHost != null)
-        {
-            // Try multiple events to catch when handle becomes available
-            VideoHost.Initialized += OnVideoHostInitialized;
-            VideoHost.Loaded += OnVideoHostLoaded;
-            VideoHost.AttachedToVisualTree += OnVideoHostAttached;
-        }
+        // Create and add custom video render control
+        VideoHost = new VideoRenderControl();
+        VideoContainer.Children.Add(VideoHost);
     }
 
     /// <summary>
@@ -56,7 +82,7 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void OnVideoHostInitialized(object? sender, EventArgs e)
     {
-        TryGetHandle("Initialized");
+        // Not used
     }
 
     /// <summary>
@@ -64,7 +90,7 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void OnVideoHostLoaded(object? sender, RoutedEventArgs e)
     {
-        TryGetHandle("Loaded");
+        // Not used
     }
 
     /// <summary>
@@ -72,54 +98,69 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void OnVideoHostAttached(object? sender, VisualTreeAttachmentEventArgs e)
     {
-        TryGetHandle("AttachedToVisualTree");
+        // Not used
     }
 
-    /// <summary>
-    /// Try to get the native window handle
-    /// </summary>
-    private void TryGetHandle(string eventName)
+    // LibVLC video callback: Setup video format
+    private uint SetupVideo(ref IntPtr opaque, ref IntPtr chroma, ref uint width, ref uint height, ref uint pitches, ref uint lines)
     {
-        if (_handleReady || VideoHost == null)
+        chroma = Marshal.StringToHGlobalAnsi("RV32");
+        _videoWidth = (int)width;
+        _videoHeight = (int)height;
+        pitches = (uint)(_videoWidth * 4);
+        lines = (uint)_videoHeight;
+        _videoBuffer = Marshal.AllocHGlobal((int)(pitches * lines));
+        return 1;
+    }
+
+    // LibVLC video callback: Cleanup
+    private void CleanupVideo(ref IntPtr opaque)
+    {
+        if (_videoBuffer != IntPtr.Zero)
         {
-            return;
+            Marshal.FreeHGlobal(_videoBuffer);
+            _videoBuffer = IntPtr.Zero;
+        }
+        _videoBitmap = null;
+        VideoHost.SetBitmap(null, 0, 0);
+    }
+
+    // LibVLC video callback: Lock frame
+    private IntPtr LockVideo(IntPtr opaque, ref IntPtr planes)
+    {
+        planes = _videoBuffer;
+        return IntPtr.Zero;
+    }
+
+    // LibVLC video callback: Unlock frame
+    private void UnlockVideo(IntPtr opaque, IntPtr picture, ref IntPtr planes)
+    {
+        // No action needed
+    }
+
+    // LibVLC video callback: Display frame
+    private void DisplayVideo(IntPtr opaque, IntPtr picture)
+    {
+        if (_videoBitmap == null || _videoBitmap.PixelSize.Width != _videoWidth || _videoBitmap.PixelSize.Height != _videoHeight)
+        {
+            _videoBitmap = new WriteableBitmap(new PixelSize(_videoWidth, _videoHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
         }
 
-        try
+        using (var buffer = _videoBitmap.Lock())
         {
-            // NativeControlHost has IPlatformHandle property
-            var platformHandle = VideoHost.PlatformHandle;
-            
-            if (platformHandle != null)
+            unsafe
             {
-                _videoHandle = platformHandle.Handle;
-                
-                if (_videoHandle != IntPtr.Zero)
+                byte* dst = (byte*)buffer.Address.ToPointer();
+                byte* src = (byte*)_videoBuffer.ToPointer();
+                int stride = _videoWidth * 4;
+                for (int y = 0; y < _videoHeight; y++)
                 {
-                    _handleReady = true;
-                    _logger.LogInfo($"Video handle obtained in {eventName}: {_videoHandle}");
-                    
-                    // If player service already exists, set the handle now
-                    if (_playerService?.MediaPlayer != null)
-                    {
-                        _playerService.MediaPlayer.Hwnd = _videoHandle;
-                        _logger.LogInfo("Handle set on existing MediaPlayer");
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning($"Handle is zero in {eventName}");
+                    Buffer.MemoryCopy(src + y * stride, dst + y * buffer.RowBytes, stride, stride);
                 }
             }
-            else
-            {
-                _logger.LogWarning($"PlatformHandle is null in {eventName}");
-            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error getting handle in {eventName}", ex);
-        }
+
+        VideoHost.SetBitmap(_videoBitmap, _videoWidth, _videoHeight);
     }
 
     /// <summary>
@@ -141,24 +182,14 @@ public partial class VideoPlayerControl : UserControl
         {
             _logger.LogInfo("Initializing video player service");
             
-            // Try to get handle if we don't have it yet
-            if (!_handleReady)
-            {
-                TryGetHandle("InitializePlayer");
-            }
-            
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
 
-            // Set the window handle if we have it
-            if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
+            // Set up LibVLC video callbacks for OpenGL rendering
+            if (_playerService.MediaPlayer != null)
             {
-                _playerService.MediaPlayer.Hwnd = _videoHandle;
-                _logger.LogInfo($"MediaPlayer.Hwnd set to: {_videoHandle}");
-            }
-            else
-            {
-                _logger.LogWarning($"Handle not ready - MediaPlayer: {_playerService.MediaPlayer != null}, HandleReady: {_handleReady}, Handle: {_videoHandle}");
+                _playerService.MediaPlayer.SetVideoFormatCallbacks(SetupVideo, CleanupVideo);
+                _playerService.MediaPlayer.SetVideoCallbacks(LockVideo, UnlockVideo, DisplayVideo);
             }
 
             // Subscribe to player events
@@ -193,23 +224,6 @@ public partial class VideoPlayerControl : UserControl
             {
                 _logger.LogError("Player service null");
                 return;
-            }
-
-            // Try to get handle if we still don't have it
-            if (!_handleReady)
-            {
-                TryGetHandle("LoadVideo");
-            }
-
-            // Ensure handle is set before loading media
-            if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
-            {
-                _playerService.MediaPlayer.Hwnd = _videoHandle;
-                _logger.LogInfo($"Handle set before loading: {_videoHandle}");
-            }
-            else
-            {
-                _logger.LogError($"Cannot set handle - MediaPlayer: {_playerService.MediaPlayer != null}, HandleReady: {_handleReady}, Handle: {_videoHandle}");
             }
 
             // Load the video
@@ -250,23 +264,6 @@ public partial class VideoPlayerControl : UserControl
         {
             _logger.LogError("No video loaded");
             return;
-        }
-
-        // Try one more time to get handle if we don't have it
-        if (!_handleReady)
-        {
-            TryGetHandle("PlayButton");
-        }
-
-        // Verify handle is set before playing
-        if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
-        {
-            _playerService.MediaPlayer.Hwnd = _videoHandle;
-            _logger.LogInfo($"Handle set before playing: {_videoHandle}");
-        }
-        else
-        {
-            _logger.LogError($"Cannot play - handle not available: HandleReady={_handleReady}, Handle={_videoHandle}");
         }
 
         _logger.LogInfo($"IsPlaying before: {_playerService.IsPlaying}");
@@ -449,13 +446,6 @@ public partial class VideoPlayerControl : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        
-        if (VideoHost != null)
-        {
-            VideoHost.Initialized -= OnVideoHostInitialized;
-            VideoHost.Loaded -= OnVideoHostLoaded;
-            VideoHost.AttachedToVisualTree -= OnVideoHostAttached;
-        }
         
         _updateTimer?.Stop();
         _updateTimer?.Dispose();

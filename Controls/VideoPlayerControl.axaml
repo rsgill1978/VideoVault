@@ -10,8 +10,7 @@
         <!-- Video Display Area -->
         <Panel Grid.Row="0" Background="Black" Name="VideoContainer"
                ToolTip.Tip="Video display area - Double click for fullscreen">
-            <!-- NativeControlHost for LibVLC video rendering -->
-            <NativeControlHost Name="VideoHost" IsVisible="True"/>
+            <!-- SKElement added in code-behind for LibVLC video rendering with OpenGL -->
             <TextBlock Text="No video loaded" 
                       Foreground="White" 
                       HorizontalAlignment="Center" 
