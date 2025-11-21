@@ -7,43 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-Phase2-Hotfix2] - 2025-11-21
+
+### Fixed
+- **Fullscreen Controls Visibility Across Different Viewports**
+  - Fixed controls not appearing on different screen sizes and resolutions
+  - Changed from Grid layout to DockPanel for fullscreen overlay
+  - DockPanel with `DockPanel.Dock="Bottom"` provides consistent positioning
+  - Controls now properly anchor to bottom regardless of viewport size or DPI
+  - Works reliably across all machines and screen configurations
+
+- **Volume Slider Not Working in Fullscreen**
+  - Added `_isUpdatingVolume` flag to prevent feedback loops
+  - Both volume sliders now sync properly without blocking each other
+  - Volume changes in fullscreen mode now work correctly
+
+### Changed
+- **Simplified Documentation**
+  - Updated all XAML comments to simplified technical English
+  - Updated all code comments to clear, concise descriptions
+  - Removed verbose inline comments
+  - All comments positioned above code lines
+  - Removed debug logging traces from fullscreen implementation
+
+### Technical Details
+- Replaced Canvas/Grid layout with DockPanel for fullscreen controls
+- Added volume slider sync logic with feedback loop prevention
+- Cleaned up fullscreen initialization and teardown code
+- Removed unused debug logging and fields
+
+---
+
 ## [1.0.0-Phase2-Hotfix1] - 2025-11-21
 
 ### Fixed
 - **Fullscreen Video Player Controls Not Visible**
   - Fixed critical bug where playback controls were not visible in fullscreen mode
-  - Root cause: Grid row positioning does not support true overlaying of controls
-  - Solution: Implemented separate fullscreen overlay control set
-  - Created dedicated FullscreenControls Border at outer Grid level with ZIndex 100
-  - Normal controls (PlayerControls) now hidden in fullscreen, overlay controls shown
-  - Overlay controls positioned at bottom with VerticalAlignment.Bottom and 10px margin
-  - Added state sync between normal and fullscreen controls for seamless transition
-  - Both control sets update in realtime during playback
+  - Implemented separate fullscreen overlay control set
+  - Created dedicated FullscreenControls with ZIndex 100
+  - Added state sync between normal and fullscreen controls
 
 ### Changed
 - **XAML Structure Redesign**
-  - Replaced single control set with dual control architecture
-  - Outer Grid now contains NormalLayout (inner grid) and FullscreenControls (overlay)
-  - NormalLayout has video area (Row 0) and PlayerControls (Row 1)
-  - FullscreenControls overlay entire grid with bottom alignment
+  - Dual control architecture with normal and fullscreen sets
   - Controls automatically sync state when switching modes
-
-- **Enhanced Documentation**
-  - Added comprehensive inline comments to VideoPlayerControl.axaml.cs
-  - All fullscreen mode logic thoroughly documented
-  - Added detailed XML comments to XAML file explaining dual-control layout
-  - Added tooltips to all video player UI elements in XAML
-  - Documented fullscreen mode behavior and control overlay mechanism
-  - All comments in simplified technical English
-  - All comments positioned above code lines per coding standards
 
 ### Technical Details
 - New method: `SyncControlsToFullscreen()` - Syncs UI state between control sets
-- Updated: `EnableFullscreenMode()` - Now toggles between control sets instead of repositioning
-- Updated: `SetControlsVisibility()` - Controls correct set based on mode
-- Updated: `UpdateTimer_Elapsed()` - Updates both control sets in realtime
-- Updated: `UpdatePlayPauseButton()` - Syncs icon across both sets
-- Updated: `UpdateVolumeButton()` - Syncs volume state across both sets
+- Updated: `EnableFullscreenMode()` - Toggles between control sets
+- Updated: `UpdatePlayPauseButton()` and `UpdateVolumeButton()` - Sync across both sets
 
 ---
 
