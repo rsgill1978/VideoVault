@@ -72,16 +72,16 @@ public partial class VideoPlayerControl : UserControl
                 // Set the window handle for LibVLC to render video
                 _playerService.MediaPlayer.Hwnd = handle;
                 _handleAttached = true;
-                Console.WriteLine($"✓ Video output attached to embedded control (handle: {handle})");
+                Console.WriteLine($"Video output attached to embedded control (handle: {handle})");
             }
             else
             {
-                Console.WriteLine("✗ Could not get window handle for embedded video");
+                Console.WriteLine("ERROR: Could not get window handle for embedded video");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Error attaching video output: {ex.Message}");
+            Console.WriteLine($"ERROR attaching video output: {ex.Message}");
         }
     }
 
@@ -114,16 +114,16 @@ public partial class VideoPlayerControl : UserControl
                 _playerService.EndReached += OnVideoEnded;
             }
 
-            Console.WriteLine("✓ Video player service initialized");
+            Console.WriteLine("Video player service initialized");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Failed to initialize video player: {ex.Message}");
+            Console.WriteLine($"Failed to initialize video player: {ex.Message}");
         }
     }
 
     /// <summary>
-    /// Load and play a video file
+    /// Load a video file (does NOT auto-play)
     /// </summary>
     public void LoadVideo(string filePath)
     {
@@ -136,25 +136,27 @@ public partial class VideoPlayerControl : UserControl
 
             if (_playerService == null)
             {
-                Console.WriteLine("✗ Cannot load video: player service not initialized");
+                Console.WriteLine("ERROR: Cannot load video - player service not initialized");
                 return;
             }
 
             // Critical: Ensure handle is attached before loading video
             if (!_handleAttached)
             {
-                Console.WriteLine("⚠ Handle not attached yet, attempting to attach...");
+                Console.WriteLine("WARNING: Handle not attached yet, attempting to attach...");
                 AttachVideoOutput();
                 
                 // If still not attached, we have a problem
                 if (!_handleAttached)
                 {
-                    Console.WriteLine("✗ Cannot load video: failed to attach to native control");
+                    Console.WriteLine("ERROR: Cannot load video - failed to attach to native control");
                     return;
                 }
             }
 
-            Console.WriteLine($"Loading video: {filePath}");
+            Console.WriteLine($"Loading video (will NOT auto-play): {filePath}");
+            
+            // Load video but do NOT play it
             _playerService.LoadVideo(filePath);
             
             IsVideoLoaded = true;
@@ -165,14 +167,17 @@ public partial class VideoPlayerControl : UserControl
                 NoVideoText.IsVisible = false;
             }
             
+            // Start update timer for UI updates
             _updateTimer?.Start();
+            
+            // Update button to show play icon (not playing)
             UpdatePlayPauseButton();
             
-            Console.WriteLine("✓ Video loaded successfully");
+            Console.WriteLine("Video loaded successfully (paused, ready to play)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"✗ Failed to load video: {ex.Message}");
+            Console.WriteLine($"Failed to load video: {ex.Message}");
         }
     }
 
@@ -183,11 +188,21 @@ public partial class VideoPlayerControl : UserControl
     {
         if (_playerService == null)
         {
+            Console.WriteLine("ERROR: Cannot play - player service not initialized");
             return;
         }
 
+        if (!IsVideoLoaded)
+        {
+            Console.WriteLine("ERROR: Cannot play - no video loaded");
+            return;
+        }
+
+        // Toggle play/pause
         _playerService.TogglePlayPause();
         UpdatePlayPauseButton();
+        
+        Console.WriteLine(_playerService.IsPlaying ? "Playing video" : "Paused video");
     }
 
     /// <summary>
