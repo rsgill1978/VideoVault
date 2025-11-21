@@ -65,9 +65,11 @@ public class VideoPlayerService : IDisposable
                 throw new Exception("LibVLC libraries not found. Please ensure VLC is installed on your system.", ex);
             }
 
-            // Create LibVLC instance with common options
-            _libVLC = new LibVLC(enableDebugLogs: false);
-            _logger.LogInfo("LibVLC instance created");
+            // Create LibVLC instance with parameters to ensure embedded playback
+            // --no-video-title-show: Don't show video title on top of video
+            // These parameters help ensure video renders in the window we specify
+            _libVLC = new LibVLC("--no-video-title-show");
+            _logger.LogInfo("LibVLC instance created with embedded mode parameters");
 
             // Create media player
             _mediaPlayer = new MediaPlayer(_libVLC);
@@ -79,7 +81,7 @@ public class VideoPlayerService : IDisposable
             _mediaPlayer.EndReached += OnEndReached;
 
             _isInitialized = true;
-            _logger.LogInfo("LibVLC initialized successfully");
+            _logger.LogInfo("LibVLC initialized successfully for embedded playback");
         }
         catch (Exception ex)
         {

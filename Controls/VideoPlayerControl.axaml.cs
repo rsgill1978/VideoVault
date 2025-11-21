@@ -21,6 +21,7 @@ public partial class VideoPlayerControl : UserControl
     private bool _isMuted = false;
     private int _volumeBeforeMute = 100;
     private bool _isFullscreen = false;
+    private bool _handleAttached = false;
 
     public VideoPlayerControl()
     {
@@ -34,6 +35,53 @@ public partial class VideoPlayerControl : UserControl
         if (VideoContainer != null)
         {
             VideoContainer.DoubleTapped += VideoContainer_DoubleTapped;
+        }
+
+        // Critical: Attach to the VideoHost as soon as it's available
+        if (VideoHost != null)
+        {
+            VideoHost.Loaded += OnVideoHostLoaded;
+        }
+    }
+
+    /// <summary>
+    /// Handle when VideoHost is loaded and ready
+    /// </summary>
+    private void OnVideoHostLoaded(object? sender, RoutedEventArgs e)
+    {
+        AttachVideoOutput();
+    }
+
+    /// <summary>
+    /// Attach video output to the native control host
+    /// </summary>
+    private void AttachVideoOutput()
+    {
+        if (_handleAttached || _playerService?.MediaPlayer == null || VideoHost == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Get the native window handle
+            var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+            
+            if (handle != IntPtr.Zero)
+            {
+                // Set the window handle for LibVLC to render video
+                _playerService.MediaPlayer.Hwnd = handle;
+                _handleAttached = true;
+                Console.WriteLine($"✓ Video output attached to embedded control (handle: {handle})");
+            }
+            else
+            {
+                Console.WriteLine("✗ Could not get window handle for embedded video");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Error attaching video output: {ex.Message}");
         }
     }
 
@@ -57,46 +105,20 @@ public partial class VideoPlayerControl : UserControl
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
 
-            // Attach LibVLC video output to the native control host
-            if (_playerService.MediaPlayer != null && VideoHost != null)
-            {
-                // Subscribe to Loaded event to ensure control is ready
-                VideoHost.Loaded += (s, e) =>
-                {
-                    try
-                    {
-                        // Get the native window handle from the NativeControlHost
-                        // This must be done after the control is loaded
-                        var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
-                        
-                        if (handle != IntPtr.Zero && _playerService?.MediaPlayer != null)
-                        {
-                            // Set the window handle for LibVLC to render video
-                            // This tells LibVLC where to draw the video output
-                            _playerService.MediaPlayer.Hwnd = handle;
-                            Console.WriteLine($"Video output attached to handle: {handle}");
-                        }
-                        else
-                        {
-                            Console.WriteLine("Warning: Could not get valid window handle for video output");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error attaching video output: {ex.Message}");
-                    }
-                };
-            }
+            // Try to attach immediately if VideoHost is already loaded
+            AttachVideoOutput();
 
             // Subscribe to player events
             if (_playerService != null)
             {
                 _playerService.EndReached += OnVideoEnded;
             }
+
+            Console.WriteLine("✓ Video player service initialized");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to initialize video player: {ex.Message}");
+            Console.WriteLine($"✗ Failed to initialize video player: {ex.Message}");
         }
     }
 
@@ -114,20 +136,25 @@ public partial class VideoPlayerControl : UserControl
 
             if (_playerService == null)
             {
+                Console.WriteLine("✗ Cannot load video: player service not initialized");
                 return;
             }
 
-            // Ensure the handle is set before loading video
-            // This is critical for embedded playback
-            if (_playerService.MediaPlayer != null && VideoHost != null)
+            // Critical: Ensure handle is attached before loading video
+            if (!_handleAttached)
             {
-                var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
-                if (handle != IntPtr.Zero)
+                Console.WriteLine("⚠ Handle not attached yet, attempting to attach...");
+                AttachVideoOutput();
+                
+                // If still not attached, we have a problem
+                if (!_handleAttached)
                 {
-                    _playerService.MediaPlayer.Hwnd = handle;
+                    Console.WriteLine("✗ Cannot load video: failed to attach to native control");
+                    return;
                 }
             }
 
+            Console.WriteLine($"Loading video: {filePath}");
             _playerService.LoadVideo(filePath);
             
             IsVideoLoaded = true;
@@ -140,10 +167,12 @@ public partial class VideoPlayerControl : UserControl
             
             _updateTimer?.Start();
             UpdatePlayPauseButton();
+            
+            Console.WriteLine("✓ Video loaded successfully");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to load video: {ex.Message}");
+            Console.WriteLine($"✗ Failed to load video: {ex.Message}");
         }
     }
 
