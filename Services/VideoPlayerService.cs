@@ -11,6 +11,7 @@ public class VideoPlayerService : IDisposable
 {
     private LibVLC? _libVLC;
     private MediaPlayer? _mediaPlayer;
+    private Media? _currentMedia;
     private readonly LoggingService _logger;
     private bool _isInitialized = false;
 
@@ -53,7 +54,7 @@ public class VideoPlayerService : IDisposable
         {
             _logger.LogInfo("Initializing LibVLC core...");
 
-            // Initialize LibVLC - this may fail if LibVLC libraries are not available
+            // Initialize LibVLC
             try
             {
                 Core.Initialize();
@@ -61,12 +62,12 @@ public class VideoPlayerService : IDisposable
             }
             catch (Exception ex)
             {
-                _logger.LogError("LibVLC Core.Initialize() failed - LibVLC libraries may be missing", ex);
-                throw new Exception("LibVLC libraries not found. Please ensure VLC is installed on your system.", ex);
+                _logger.LogError("LibVLC Core.Initialize() failed", ex);
+                throw new Exception("LibVLC libraries not found. Please ensure VLC is installed.", ex);
             }
 
-            // Create LibVLC instance with common options
-            _libVLC = new LibVLC(enableDebugLogs: false);
+            // Create LibVLC instance with parameters for embedded playback
+            _libVLC = new LibVLC("--no-video-title-show");
             _logger.LogInfo("LibVLC instance created");
 
             // Create media player
@@ -107,13 +108,16 @@ public class VideoPlayerService : IDisposable
         {
             _logger.LogInfo($"Loading video: {filePath}");
 
-            // Create media from file
-            using var media = new Media(_libVLC, filePath, FromType.FromPath);
+            // Dispose previous media if exists
+            _currentMedia?.Dispose();
 
-            // Set media to player (but don't play yet)
-            _mediaPlayer.Media = media;
+            // Create media from file and keep reference
+            _currentMedia = new Media(_libVLC, filePath, FromType.FromPath);
 
-            _logger.LogInfo("Video loaded (not playing)");
+            // Set media to player
+            _mediaPlayer.Media = _currentMedia;
+
+            _logger.LogInfo("Video loaded (paused, ready to play)");
         }
         catch (Exception ex)
         {
@@ -143,6 +147,10 @@ public class VideoPlayerService : IDisposable
         {
             _mediaPlayer.Play();
             _logger.LogInfo("Video playback started");
+        }
+        else
+        {
+            _logger.LogWarning("Cannot play - no media loaded");
         }
     }
 
@@ -195,7 +203,8 @@ public class VideoPlayerService : IDisposable
             }
             else
             {
-                Resume();
+                // If not playing, start playing (works for both stopped and paused states)
+                Play();
             }
         }
     }
@@ -289,6 +298,9 @@ public class VideoPlayerService : IDisposable
             _mediaPlayer.Dispose();
             _mediaPlayer = null;
         }
+
+        _currentMedia?.Dispose();
+        _currentMedia = null;
 
         _libVLC?.Dispose();
         _libVLC = null;
