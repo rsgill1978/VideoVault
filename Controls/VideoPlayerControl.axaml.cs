@@ -491,11 +491,30 @@ public partial class VideoPlayerControl : UserControl
 
         if (enable)
         {
+            _logger.LogInfo("Enabling fullscreen mode");
+
+            // Ensure video container is visible
+            if (VideoContainer != null)
+            {
+                VideoContainer.IsVisible = true;
+                VideoContainer.ZIndex = 0;
+                _logger.LogInfo($"VideoContainer visible: {VideoContainer.IsVisible}, Bounds: {VideoContainer.Bounds}");
+            }
+
+            // Ensure VLC host is visible
+            if (_vlcHost != null)
+            {
+                _vlcHost.IsVisible = true;
+                _vlcHost.ZIndex = 0;
+                _logger.LogInfo($"VlcHost visible: {_vlcHost.IsVisible}, Bounds: {_vlcHost.Bounds}");
+            }
+
             // Move controls to overlay position (Grid.Row=0 with VerticalAlignment=Bottom)
             if (PlayerControls != null)
             {
                 PlayerControls.SetValue(Grid.RowProperty, 0);
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
+                PlayerControls.ZIndex = 100; // Ensure controls are above video
 
                 // Make controls semi-transparent for fullscreen
                 PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
@@ -517,11 +536,14 @@ public partial class VideoPlayerControl : UserControl
         }
         else
         {
+            _logger.LogInfo("Disabling fullscreen mode");
+
             // Restore controls to normal position (Grid.Row=1)
             if (PlayerControls != null)
             {
                 PlayerControls.SetValue(Grid.RowProperty, 1);
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+                PlayerControls.ZIndex = 0;
 
                 // Restore normal controls background
                 PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
