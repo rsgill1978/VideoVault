@@ -21,11 +21,13 @@ public partial class VideoPlayerControl : UserControl
     private bool _isMuted = false;
     private int _volumeBeforeMute = 100;
     private bool _isFullscreen = false;
-    private bool _handleAttached = false;
+    private readonly LoggingService _logger;
 
     public VideoPlayerControl()
     {
         InitializeComponent();
+        
+        _logger = LoggingService.Instance;
         
         // Set up update timer for UI updates
         _updateTimer = new Timer(100);
@@ -35,53 +37,6 @@ public partial class VideoPlayerControl : UserControl
         if (VideoContainer != null)
         {
             VideoContainer.DoubleTapped += VideoContainer_DoubleTapped;
-        }
-
-        // Critical: Attach to the VideoHost as soon as it's available
-        if (VideoHost != null)
-        {
-            VideoHost.Loaded += OnVideoHostLoaded;
-        }
-    }
-
-    /// <summary>
-    /// Handle when VideoHost is loaded and ready
-    /// </summary>
-    private void OnVideoHostLoaded(object? sender, RoutedEventArgs e)
-    {
-        AttachVideoOutput();
-    }
-
-    /// <summary>
-    /// Attach video output to the native control host
-    /// </summary>
-    private void AttachVideoOutput()
-    {
-        if (_handleAttached || _playerService?.MediaPlayer == null || VideoHost == null)
-        {
-            return;
-        }
-
-        try
-        {
-            // Get the native window handle
-            var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
-            
-            if (handle != IntPtr.Zero)
-            {
-                // Set the window handle for LibVLC to render video
-                _playerService.MediaPlayer.Hwnd = handle;
-                _handleAttached = true;
-                Console.WriteLine($"Video output attached to embedded control (handle: {handle})");
-            }
-            else
-            {
-                Console.WriteLine("ERROR: Could not get window handle for embedded video");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"ERROR attaching video output: {ex.Message}");
         }
     }
 
@@ -102,11 +57,26 @@ public partial class VideoPlayerControl : UserControl
     {
         try
         {
+            _logger.LogInfo("Initializing video player service");
+            
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
 
-            // Try to attach immediately if VideoHost is already loaded
-            AttachVideoOutput();
+            // CRITICAL: Set the window handle immediately after creating MediaPlayer
+            if (_playerService.MediaPlayer != null && VideoHost != null)
+            {
+                var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+                
+                if (handle != IntPtr.Zero)
+                {
+                    _playerService.MediaPlayer.Hwnd = handle;
+                    _logger.LogInfo($"Video output handle set: {handle}");
+                }
+                else
+                {
+                    _logger.LogError("Could not get window handle");
+                }
+            }
 
             // Subscribe to player events
             if (_playerService != null)
@@ -114,11 +84,11 @@ public partial class VideoPlayerControl : UserControl
                 _playerService.EndReached += OnVideoEnded;
             }
 
-            Console.WriteLine("Video player service initialized");
+            _logger.LogInfo("Video player initialized");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to initialize video player: {ex.Message}");
+            _logger.LogError("Failed to initialize video player", ex);
         }
     }
 
@@ -129,6 +99,8 @@ public partial class VideoPlayerControl : UserControl
     {
         try
         {
+            _logger.LogInfo($"LoadVideo called: {filePath}");
+            
             if (_playerService == null)
             {
                 InitializePlayer();
@@ -136,27 +108,22 @@ public partial class VideoPlayerControl : UserControl
 
             if (_playerService == null)
             {
-                Console.WriteLine("ERROR: Cannot load video - player service not initialized");
+                _logger.LogError("Player service not initialized");
                 return;
             }
 
-            // Critical: Ensure handle is attached before loading video
-            if (!_handleAttached)
+            // Ensure handle is set before loading
+            if (_playerService.MediaPlayer != null && VideoHost != null)
             {
-                Console.WriteLine("WARNING: Handle not attached yet, attempting to attach...");
-                AttachVideoOutput();
-                
-                // If still not attached, we have a problem
-                if (!_handleAttached)
+                var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+                if (handle != IntPtr.Zero && _playerService.MediaPlayer.Hwnd != handle)
                 {
-                    Console.WriteLine("ERROR: Cannot load video - failed to attach to native control");
-                    return;
+                    _playerService.MediaPlayer.Hwnd = handle;
+                    _logger.LogInfo($"Handle re-attached: {handle}");
                 }
             }
 
-            Console.WriteLine($"Loading video (will NOT auto-play): {filePath}");
-            
-            // Load video but do NOT play it
+            // Load video
             _playerService.LoadVideo(filePath);
             
             IsVideoLoaded = true;
@@ -167,17 +134,15 @@ public partial class VideoPlayerControl : UserControl
                 NoVideoText.IsVisible = false;
             }
             
-            // Start update timer for UI updates
+            // Start update timer
             _updateTimer?.Start();
-            
-            // Update button to show play icon (not playing)
             UpdatePlayPauseButton();
             
-            Console.WriteLine("Video loaded successfully (paused, ready to play)");
+            _logger.LogInfo("Video loaded (paused)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to load video: {ex.Message}");
+            _logger.LogError("Failed to load video", ex);
         }
     }
 
@@ -186,23 +151,27 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void PlayPauseButton_Click(object? sender, RoutedEventArgs e)
     {
+        _logger.LogInfo("Play/Pause clicked");
+        
         if (_playerService == null)
         {
-            Console.WriteLine("ERROR: Cannot play - player service not initialized");
+            _logger.LogError("Player service null");
             return;
         }
 
         if (!IsVideoLoaded)
         {
-            Console.WriteLine("ERROR: Cannot play - no video loaded");
+            _logger.LogError("No video loaded");
             return;
         }
 
+        _logger.LogInfo($"Before toggle - IsPlaying: {_playerService.IsPlaying}");
+        
         // Toggle play/pause
         _playerService.TogglePlayPause();
         UpdatePlayPauseButton();
         
-        Console.WriteLine(_playerService.IsPlaying ? "Playing video" : "Paused video");
+        _logger.LogInfo($"After toggle - IsPlaying: {_playerService.IsPlaying}");
     }
 
     /// <summary>
@@ -221,7 +190,6 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void ProgressSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
-        // Only seek if user is interacting with slider
         if (_isUserSeeking && _playerService != null)
         {
             float position = (float)(e.NewValue / 100.0);
@@ -238,8 +206,6 @@ public partial class VideoPlayerControl : UserControl
         {
             int volume = (int)e.NewValue;
             _playerService.SetVolume(volume);
-            
-            // Update mute button
             UpdateVolumeButton();
         }
     }
@@ -256,14 +222,12 @@ public partial class VideoPlayerControl : UserControl
 
         if (_isMuted)
         {
-            // Unmute
             _playerService.SetVolume(_volumeBeforeMute);
             VolumeSlider.Value = _volumeBeforeMute;
             _isMuted = false;
         }
         else
         {
-            // Mute
             _volumeBeforeMute = _playerService.GetVolume();
             _playerService.SetVolume(0);
             VolumeSlider.Value = 0;
@@ -320,31 +284,27 @@ public partial class VideoPlayerControl : UserControl
             return;
         }
 
-        // Update UI on UI thread
         Dispatcher.UIThread.Post(() =>
         {
             try
             {
-                // Update progress slider
                 if (!_isUserSeeking)
                 {
                     float position = _playerService.Position;
                     ProgressSlider.Value = position * 100;
                 }
 
-                // Update time display
                 long currentTime = _playerService.Time;
                 long duration = _playerService.Duration;
 
                 TimeText.Text = FormatTime(currentTime);
                 DurationText.Text = FormatTime(duration);
 
-                // Update play/pause button
                 UpdatePlayPauseButton();
             }
             catch
             {
-                // Ignore errors during UI updates
+                // Ignore UI update errors
             }
         });
     }
