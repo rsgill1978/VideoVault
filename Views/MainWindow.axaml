@@ -137,7 +137,8 @@
                             SelectedItem="{Binding SelectedVideo}"
                             Background="White"
                             SelectionChanged="VideoList_SelectionChanged"
-                            ToolTip.Tip="List of video files in the catalog - Select to play">
+                            DoubleTapped="VideoList_DoubleTapped"
+                            ToolTip.Tip="List of video files in the catalog - Double-click to play">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5">

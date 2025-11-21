@@ -26,17 +26,7 @@ public partial class MainWindow : Window
             _logger = LoggingService.Instance;
             
             InitializeComponent();
-            
-            // Add ESC key handler for exiting fullscreen
-            this.KeyDown += (s, e) =>
-            {
-                if (e.Key == Avalonia.Input.Key.Escape && this.WindowState == WindowState.FullScreen)
-                {
-                    ExitFullscreen();
-                    e.Handled = true;
-                }
-            };
-            
+
             // Initialize video player after the window is loaded
             this.Loaded += async (s, e) =>
             {
@@ -193,12 +183,22 @@ public partial class MainWindow : Window
     /// </summary>
     private void VideoList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        // Just update the selection - don't auto-load the video
+        // User must double-click or press play button to load and play
+        _logger.LogInfo($"Video selected: {ViewModel?.SelectedVideo?.FileName ?? "none"}");
+    }
+
+    /// <summary>
+    /// Handle video list double-click to load and play
+    /// </summary>
+    private void VideoList_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
+    {
         if (ViewModel == null || ViewModel.SelectedVideo == null) return;
-        
+
         try
         {
             var filePath = ViewModel.SelectedVideo.FilePath;
-            
+
             // Check if file exists
             if (!File.Exists(filePath))
             {
@@ -206,12 +206,12 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Load selected video (name will be updated when playback starts)
-            VideoPlayer.LoadVideo(filePath);
+            // Load and play the selected video
+            VideoPlayer.LoadAndPlay(filePath);
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to load selected video", ex);
+            _logger.LogError("Failed to load and play video", ex);
         }
     }
 
@@ -265,7 +265,6 @@ public partial class MainWindow : Window
             if (CurrentVideoName != null)
             {
                 CurrentVideoName.Text = videoName;
-                _logger.LogInfo($"Updated video name display: {videoName}");
             }
         });
     }
@@ -273,34 +272,51 @@ public partial class MainWindow : Window
     /// <summary>
     /// Handle fullscreen toggle
     /// </summary>
-    private void OnFullscreenToggled(bool isFullscreen)
+    private async void OnFullscreenToggled(bool isFullscreen)
     {
         if (isFullscreen)
         {
-            EnterFullscreen();
+            await EnterFullscreen();
         }
         else
         {
-            ExitFullscreen();
+            // Fullscreen is handled by the fullscreen window closing
+            // This code path shouldn't be hit
         }
     }
 
     /// <summary>
     /// Enter fullscreen mode
     /// </summary>
-    private void EnterFullscreen()
+    private async System.Threading.Tasks.Task EnterFullscreen()
     {
-        _logger.LogDebug("Entering fullscreen mode");
-        this.WindowState = WindowState.FullScreen;
-    }
+        // Check if video is loaded
+        if (VideoPlayer == null || !VideoPlayer.IsVideoLoaded)
+        {
+            _logger.LogWarning("Cannot enter fullscreen: No video loaded");
+            await ShowMessageBox("No Video", "Please load a video before entering fullscreen mode.");
+            return;
+        }
 
-    /// <summary>
-    /// Exit fullscreen mode
-    /// </summary>
-    private void ExitFullscreen()
-    {
-        _logger.LogDebug("Exiting fullscreen mode");
-        this.WindowState = WindowState.Normal;
+        _logger.LogInfo("Entering fullscreen mode");
+
+        var currentVideo = ViewModel?.SelectedVideo?.FileName ?? "Video";
+
+        // Create fullscreen window
+        var fullscreenWindow = new FullscreenVideoWindow();
+        fullscreenWindow.SetVideoPlayer(VideoPlayer, currentVideo);
+
+        // Show fullscreen window
+        await fullscreenWindow.ShowDialog(this);
+
+        // When window closes, restore video player to main window
+        var player = fullscreenWindow.GetVideoPlayer();
+        if (player != null && VideoPlayerContent is Border border)
+        {
+            border.Child = player;
+        }
+
+        _logger.LogInfo("Exited fullscreen mode");
     }
 
     /// <summary>
@@ -385,9 +401,9 @@ public partial class MainWindow : Window
                         FontWeight = Avalonia.Media.FontWeight.Bold,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                     },
-                    new TextBlock 
-                    { 
-                        Text = "Version 1.0.0 - Phase 2", 
+                    new TextBlock
+                    {
+                        Text = "Version 1.0.0",
                         FontSize = 14,
                         HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center
                     },

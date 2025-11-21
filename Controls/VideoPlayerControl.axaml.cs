@@ -20,6 +20,7 @@ public partial class VideoPlayerControl : UserControl
     private VideoPlayerService? _playerService;
     private Timer? _updateTimer;
     private bool _isUserSeeking = false;
+    private bool _isTimerUpdatingSlider = false;
     private bool _isMuted = false;
     private int _volumeBeforeMute = 100;
     private bool _isFullscreen = false;
@@ -85,13 +86,11 @@ public partial class VideoPlayerControl : UserControl
     {
         _videoHandle = handle;
         _handleReady = true;
-        _logger.LogInfo($"Native control handle created: {_videoHandle}");
 
         // If player service already exists, set the handle now
         if (_playerService?.MediaPlayer != null)
         {
             _playerService.MediaPlayer.Hwnd = _videoHandle;
-            _logger.LogInfo("Handle set on existing MediaPlayer");
         }
     }
 
@@ -119,7 +118,6 @@ public partial class VideoPlayerControl : UserControl
         try
         {
             _isInitializing = true;
-            _logger.LogInfo("Initializing video player service");
 
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
@@ -128,11 +126,6 @@ public partial class VideoPlayerControl : UserControl
             if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
             {
                 _playerService.MediaPlayer.Hwnd = _videoHandle;
-                _logger.LogInfo($"MediaPlayer.Hwnd set to: {_videoHandle}");
-            }
-            else
-            {
-                _logger.LogWarning($"Handle not ready - MediaPlayer: {_playerService.MediaPlayer != null}, HandleReady: {_handleReady}, Handle: {_videoHandle}");
             }
 
             // Subscribe to player events
@@ -141,14 +134,11 @@ public partial class VideoPlayerControl : UserControl
                 _playerService.EndReached += OnVideoEnded;
             }
 
-            _logger.LogInfo("Video player initialized");
-
             // Load pending video if there is one
             if (_pendingVideoPath != null)
             {
                 var pendingPath = _pendingVideoPath;
                 _pendingVideoPath = null;
-                _logger.LogInfo($"Loading pending video: {pendingPath}");
                 LoadVideo(pendingPath);
             }
         }
@@ -163,18 +153,36 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
+    /// Load and play a video file
+    /// </summary>
+    public void LoadAndPlay(string filePath)
+    {
+        LoadVideo(filePath);
+
+        // Start playing automatically
+        if (IsVideoLoaded && _playerService != null && !_playerService.IsPlaying)
+        {
+            _playerService.Play();
+            UpdatePlayPauseButton();
+
+            // Fire the VideoStarted event
+            if (_currentVideoName != null)
+            {
+                VideoStarted?.Invoke(_currentVideoName);
+            }
+        }
+    }
+
+    /// <summary>
     /// Load a video file (does NOT auto-play)
     /// </summary>
     public void LoadVideo(string filePath)
     {
         try
         {
-            _logger.LogInfo($"LoadVideo: {filePath}");
-
             // If initialization is in progress, queue this video
             if (_isInitializing)
             {
-                _logger.LogInfo("Initialization in progress, queueing video");
                 _pendingVideoPath = filePath;
                 return;
             }
@@ -182,7 +190,6 @@ public partial class VideoPlayerControl : UserControl
             // Initialize player if not already initialized
             if (_playerService == null)
             {
-                _logger.LogInfo("Player not initialized, starting initialization and queueing video");
                 _pendingVideoPath = filePath;
                 InitializePlayer();
                 return;
@@ -199,17 +206,12 @@ public partial class VideoPlayerControl : UserControl
             if (_handleReady && _videoHandle != IntPtr.Zero)
             {
                 _playerService.MediaPlayer.Hwnd = _videoHandle;
-                _logger.LogInfo($"Handle set before loading: {_videoHandle}");
-            }
-            else
-            {
-                _logger.LogWarning($"Handle not ready - HandleReady: {_handleReady}, Handle: {_videoHandle}");
             }
 
             // Load the video
             _playerService.LoadVideo(filePath);
 
-            // Store the video name (will be displayed when playback starts)
+            // Store the video name
             _currentVideoName = System.IO.Path.GetFileName(filePath);
 
             IsVideoLoaded = true;
@@ -222,7 +224,12 @@ public partial class VideoPlayerControl : UserControl
             _updateTimer?.Start();
             UpdatePlayPauseButton();
 
-            _logger.LogInfo("Video loaded successfully");
+            // Fire the VideoStarted event immediately when video is loaded
+            // This ensures the name is displayed even if auto-play happens
+            if (_currentVideoName != null)
+            {
+                VideoStarted?.Invoke(_currentVideoName);
+            }
         }
         catch (Exception ex)
         {
@@ -235,17 +242,40 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void PlayPauseButton_Click(object? sender, RoutedEventArgs e)
     {
-        _logger.LogInfo("Play button clicked");
-        
         if (_playerService == null)
         {
             _logger.LogError("Player service null");
             return;
         }
 
+        // If no video is loaded, try to load the selected video from parent window
         if (!IsVideoLoaded)
         {
-            _logger.LogError("No video loaded");
+            // Try to get selected video from MainWindow by traversing visual tree
+            var parent = this.Parent;
+            Views.MainWindow? mainWindow = null;
+
+            while (parent != null)
+            {
+                if (parent is Views.MainWindow window)
+                {
+                    mainWindow = window;
+                    break;
+                }
+                parent = (parent as Control)?.Parent;
+            }
+
+            if (mainWindow?.DataContext is ViewModels.MainWindowViewModel viewModel && viewModel.SelectedVideo != null)
+            {
+                var filePath = viewModel.SelectedVideo.FilePath;
+                if (System.IO.File.Exists(filePath))
+                {
+                    LoadAndPlay(filePath);
+                    return;
+                }
+            }
+
+            _logger.LogError("No video loaded or selected");
             return;
         }
 
@@ -253,14 +283,7 @@ public partial class VideoPlayerControl : UserControl
         if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
         {
             _playerService.MediaPlayer.Hwnd = _videoHandle;
-            _logger.LogInfo($"Handle set before playing: {_videoHandle}");
         }
-        else
-        {
-            _logger.LogError($"Cannot play - handle not available: HandleReady={_handleReady}, Handle={_videoHandle}");
-        }
-
-        _logger.LogInfo($"IsPlaying before: {_playerService.IsPlaying}");
 
         bool wasPlaying = _playerService.IsPlaying;
         _playerService.TogglePlayPause();
@@ -270,10 +293,7 @@ public partial class VideoPlayerControl : UserControl
         if (!wasPlaying && _playerService.IsPlaying && _currentVideoName != null)
         {
             VideoStarted?.Invoke(_currentVideoName);
-            _logger.LogInfo($"Video started playing: {_currentVideoName}");
         }
-
-        _logger.LogInfo($"IsPlaying after: {_playerService.IsPlaying}");
     }
 
     /// <summary>
@@ -309,7 +329,6 @@ public partial class VideoPlayerControl : UserControl
             {
                 float position = (float)(ProgressSlider.Value / 100.0);
                 _playerService.SetPosition(position);
-                _logger.LogInfo($"Seeking to position: {position:P0}");
             }
         }
     }
@@ -328,7 +347,6 @@ public partial class VideoPlayerControl : UserControl
             {
                 float position = (float)(ProgressSlider.Value / 100.0);
                 _playerService.SetPosition(position);
-                _logger.LogInfo($"Seeking to position (capture lost): {position:P0}");
             }
         }
     }
@@ -338,8 +356,22 @@ public partial class VideoPlayerControl : UserControl
     /// </summary>
     private void ProgressSlider_ValueChanged(object? sender, RangeBaseValueChangedEventArgs e)
     {
-        // Don't update video position while timer is updating the slider
-        // Only seek when user manually changes it (handled in PointerReleased)
+        // If timer is updating, ignore
+        if (_isTimerUpdatingSlider)
+        {
+            return;
+        }
+
+        // Otherwise, this is a user interaction - perform seek immediately
+        if (_playerService != null && ProgressSlider != null)
+        {
+            float position = (float)(e.NewValue / 100.0);
+            _playerService.SetPosition(position);
+
+            // Set flag to prevent timer from updating slider briefly
+            _isUserSeeking = true;
+            Task.Delay(500).ContinueWith(_ => _isUserSeeking = false);
+        }
     }
 
     /// <summary>
@@ -437,8 +469,10 @@ public partial class VideoPlayerControl : UserControl
             {
                 if (!_isUserSeeking)
                 {
+                    _isTimerUpdatingSlider = true;
                     float position = _playerService.Position;
                     ProgressSlider.Value = position * 100;
+                    _isTimerUpdatingSlider = false;
                 }
 
                 long currentTime = _playerService.Time;
@@ -452,6 +486,7 @@ public partial class VideoPlayerControl : UserControl
             catch
             {
                 // Ignore UI update errors
+                _isTimerUpdatingSlider = false;
             }
         });
     }
