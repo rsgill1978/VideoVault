@@ -60,18 +60,25 @@ public partial class VideoPlayerControl : UserControl
             // Attach LibVLC video output to the native control host
             if (_playerService.MediaPlayer != null && VideoHost != null)
             {
-                // Wait for the control to be initialized
-                VideoHost.AttachedToVisualTree += (s, e) =>
+                // Subscribe to Loaded event to ensure control is ready
+                VideoHost.Loaded += (s, e) =>
                 {
                     try
                     {
-                        // Get the platform handle using IPlatformHandle interface
-                        var platformHandle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+                        // Get the native window handle from the NativeControlHost
+                        // This must be done after the control is loaded
+                        var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
                         
-                        if (platformHandle != IntPtr.Zero && _playerService.MediaPlayer != null)
+                        if (handle != IntPtr.Zero && _playerService?.MediaPlayer != null)
                         {
-                            // Set the window handle for video rendering
-                            _playerService.MediaPlayer.Hwnd = platformHandle;
+                            // Set the window handle for LibVLC to render video
+                            // This tells LibVLC where to draw the video output
+                            _playerService.MediaPlayer.Hwnd = handle;
+                            Console.WriteLine($"Video output attached to handle: {handle}");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Warning: Could not get valid window handle for video output");
                         }
                     }
                     catch (Exception ex)
@@ -108,6 +115,17 @@ public partial class VideoPlayerControl : UserControl
             if (_playerService == null)
             {
                 return;
+            }
+
+            // Ensure the handle is set before loading video
+            // This is critical for embedded playback
+            if (_playerService.MediaPlayer != null && VideoHost != null)
+            {
+                var handle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+                if (handle != IntPtr.Zero)
+                {
+                    _playerService.MediaPlayer.Hwnd = handle;
+                }
             }
 
             _playerService.LoadVideo(filePath);
