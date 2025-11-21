@@ -31,6 +31,8 @@ public partial class VideoPlayerControl : UserControl
     private bool _isInitializing = false;
     private string? _pendingVideoPath = null;
     private string? _currentVideoName = null;
+    private Timer? _controlsHideTimer;
+    private bool _isInFullscreenMode = false;
 
     /// <summary>
     /// Event fired when video starts playing
@@ -46,6 +48,11 @@ public partial class VideoPlayerControl : UserControl
         // Set up update timer for UI updates
         _updateTimer = new Timer(100);
         _updateTimer.Elapsed += UpdateTimer_Elapsed;
+
+        // Set up controls auto-hide timer (3 seconds)
+        _controlsHideTimer = new Timer(3000);
+        _controlsHideTimer.Elapsed += ControlsHideTimer_Elapsed;
+        _controlsHideTimer.AutoReset = false;
 
         // Add double-click handler for fullscreen
         if (VideoContainer != null)
@@ -73,6 +80,9 @@ public partial class VideoPlayerControl : UserControl
                 panel.Children.Insert(index, _vlcHost);
                 _vlcHost.Name = "VideoHost";
                 _vlcHost.IsVisible = true;
+                // Preserve alignment to ensure video fills the space
+                _vlcHost.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+                _vlcHost.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
             }
 
             _vlcHost.HandleCreated += OnHandleCreated;
@@ -462,6 +472,134 @@ public partial class VideoPlayerControl : UserControl
     }
 
     /// <summary>
+    /// Set visibility of player controls
+    /// </summary>
+    public void SetControlsVisibility(bool visible)
+    {
+        if (PlayerControls != null)
+        {
+            PlayerControls.IsVisible = visible;
+        }
+    }
+
+    /// <summary>
+    /// Enable fullscreen mode with auto-hide controls
+    /// </summary>
+    public void EnableFullscreenMode(bool enable)
+    {
+        _isInFullscreenMode = enable;
+
+        if (enable)
+        {
+            // Move controls to overlay position (Grid.Row=0 with VerticalAlignment=Bottom)
+            if (PlayerControls != null)
+            {
+                PlayerControls.SetValue(Grid.RowProperty, 0);
+                PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
+
+                // Make controls semi-transparent for fullscreen
+                PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromArgb(200, 40, 40, 40)); // Semi-transparent dark background
+            }
+
+            // Initially hide controls in fullscreen
+            SetControlsVisibility(false);
+
+            // Add mouse move handler to the entire control
+            this.PointerMoved += OnPointerMovedInFullscreen;
+
+            // Add mouse enter/leave handlers to controls
+            if (PlayerControls != null)
+            {
+                PlayerControls.PointerEntered += OnControlsPointerEntered;
+                PlayerControls.PointerExited += OnControlsPointerExited;
+            }
+        }
+        else
+        {
+            // Restore controls to normal position (Grid.Row=1)
+            if (PlayerControls != null)
+            {
+                PlayerControls.SetValue(Grid.RowProperty, 1);
+                PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+
+                // Restore normal controls background
+                PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
+                    Avalonia.Media.Color.FromRgb(240, 240, 240)); // Normal light background
+            }
+
+            // Remove handlers when exiting fullscreen
+            this.PointerMoved -= OnPointerMovedInFullscreen;
+
+            if (PlayerControls != null)
+            {
+                PlayerControls.PointerEntered -= OnControlsPointerEntered;
+                PlayerControls.PointerExited -= OnControlsPointerExited;
+            }
+
+            // Stop the hide timer
+            _controlsHideTimer?.Stop();
+
+            // Show controls when exiting fullscreen
+            SetControlsVisibility(true);
+        }
+    }
+
+    /// <summary>
+    /// Handle pointer moved in fullscreen mode
+    /// </summary>
+    private void OnPointerMovedInFullscreen(object? sender, PointerEventArgs e)
+    {
+        if (!_isInFullscreenMode) return;
+
+        // Show controls
+        Dispatcher.UIThread.Post(() =>
+        {
+            SetControlsVisibility(true);
+        });
+
+        // Restart the hide timer
+        _controlsHideTimer?.Stop();
+        _controlsHideTimer?.Start();
+    }
+
+    /// <summary>
+    /// Handle pointer entered controls area
+    /// </summary>
+    private void OnControlsPointerEntered(object? sender, PointerEventArgs e)
+    {
+        if (!_isInFullscreenMode) return;
+
+        // Stop the hide timer when mouse is over controls
+        _controlsHideTimer?.Stop();
+    }
+
+    /// <summary>
+    /// Handle pointer exited controls area
+    /// </summary>
+    private void OnControlsPointerExited(object? sender, PointerEventArgs e)
+    {
+        if (!_isInFullscreenMode) return;
+
+        // Restart the hide timer when mouse leaves controls
+        _controlsHideTimer?.Stop();
+        _controlsHideTimer?.Start();
+    }
+
+    /// <summary>
+    /// Timer callback to hide controls
+    /// </summary>
+    private void ControlsHideTimer_Elapsed(object? sender, ElapsedEventArgs e)
+    {
+        if (!_isInFullscreenMode) return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            SetControlsVisibility(false);
+        });
+    }
+
+    /// <summary>
     /// Update timer elapsed event
     /// </summary>
     private void UpdateTimer_Elapsed(object? sender, ElapsedEventArgs e)
@@ -544,6 +682,8 @@ public partial class VideoPlayerControl : UserControl
 
         _updateTimer?.Stop();
         _updateTimer?.Dispose();
+        _controlsHideTimer?.Stop();
+        _controlsHideTimer?.Dispose();
         _playerService?.Dispose();
     }
 }

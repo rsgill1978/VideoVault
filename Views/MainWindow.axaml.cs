@@ -195,6 +195,22 @@ public partial class MainWindow : Window
     /// </summary>
     private void VideoList_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
     {
+        PlaySelectedVideo();
+    }
+
+    /// <summary>
+    /// Handle context menu "Play Video" click
+    /// </summary>
+    private void PlayVideoMenuItem_Click(object? sender, RoutedEventArgs e)
+    {
+        PlaySelectedVideo();
+    }
+
+    /// <summary>
+    /// Play the currently selected video
+    /// </summary>
+    private void PlaySelectedVideo()
+    {
         if (ViewModel == null || ViewModel.SelectedVideo == null) return;
 
         try
@@ -208,8 +224,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Load and play the selected video
+            // Load and play the selected video (will replace currently playing video if any)
             VideoPlayer.LoadAndPlay(filePath);
+            _logger.LogInfo($"Now playing: {ViewModel.SelectedVideo.FileName}");
         }
         catch (Exception ex)
         {
@@ -329,6 +346,28 @@ public partial class MainWindow : Window
             if (MainContentArea != null) MainContentArea.IsVisible = false;
             if (StatusBar != null) StatusBar.IsVisible = false;
 
+            // Expand video player to fill entire window
+            if (VideoPlayerRow != null)
+            {
+                VideoPlayerRow.SetValue(Grid.RowProperty, 0);
+                VideoPlayerRow.SetValue(Grid.RowSpanProperty, 6);
+            }
+
+            // Hide video player content border and make player fill space
+            if (VideoPlayerContent != null)
+            {
+                VideoPlayerContent.BorderThickness = new Avalonia.Thickness(0);
+                VideoPlayerContent.Padding = new Avalonia.Thickness(0);
+                VideoPlayerContent.Background = Avalonia.Media.Brushes.Transparent; // Remove white background
+            }
+
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Height = double.NaN; // Auto height to fill available space
+                // Enable fullscreen mode with auto-hide controls
+                VideoPlayer.EnableFullscreenMode(true);
+            }
+
             // Make window fullscreen
             WindowState = WindowState.FullScreen;
 
@@ -356,6 +395,29 @@ public partial class MainWindow : Window
 
             // Restore window state
             WindowState = WindowState.Normal;
+
+            // Restore video player row position
+            if (VideoPlayerRow != null)
+            {
+                VideoPlayerRow.SetValue(Grid.RowProperty, 3);
+                VideoPlayerRow.SetValue(Grid.RowSpanProperty, 1);
+            }
+
+            // Restore video player content border
+            if (VideoPlayerContent != null)
+            {
+                VideoPlayerContent.BorderThickness = new Avalonia.Thickness(1);
+                VideoPlayerContent.Padding = new Avalonia.Thickness(5);
+                VideoPlayerContent.Background = Avalonia.Media.Brushes.White; // Restore white background
+            }
+
+            // Restore video player height
+            if (VideoPlayer != null)
+            {
+                VideoPlayer.Height = 400;
+                // Disable fullscreen mode
+                VideoPlayer.EnableFullscreenMode(false);
+            }
 
             // Show all UI elements
             if (MainMenu != null) MainMenu.IsVisible = true;

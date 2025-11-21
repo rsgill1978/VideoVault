@@ -138,7 +138,17 @@
                             Background="White"
                             SelectionChanged="VideoList_SelectionChanged"
                             DoubleTapped="VideoList_DoubleTapped"
-                            ToolTip.Tip="List of video files in the catalog - Double-click to play">
+                            Name="VideoListBox"
+                            ToolTip.Tip="List of video files in the catalog - Double-click to play or right-click for options">
+                        <ListBox.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Play Video" Click="PlayVideoMenuItem_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="▶" FontSize="14"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="5">
