@@ -23,6 +23,7 @@ public partial class VideoPlayerControl : UserControl
     private bool _isFullscreen = false;
     private readonly LoggingService _logger;
     private IntPtr _videoHandle = IntPtr.Zero;
+    private bool _handleReady = false;
 
     public VideoPlayerControl()
     {
@@ -40,28 +41,84 @@ public partial class VideoPlayerControl : UserControl
             VideoContainer.DoubleTapped += VideoContainer_DoubleTapped;
         }
 
-        // Wait for VideoHost to be attached to visual tree before getting handle
-        this.AttachedToVisualTree += OnAttachedToVisualTree;
+        // Subscribe to events to get handle when ready
+        if (VideoHost != null)
+        {
+            // Try multiple events to catch when handle becomes available
+            VideoHost.Initialized += OnVideoHostInitialized;
+            VideoHost.Loaded += OnVideoHostLoaded;
+            VideoHost.AttachedToVisualTree += OnVideoHostAttached;
+        }
     }
 
     /// <summary>
-    /// Handle when control is attached to visual tree
+    /// Handle when VideoHost is initialized
     /// </summary>
-    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e)
+    private void OnVideoHostInitialized(object? sender, EventArgs e)
     {
-        // Get the handle once the control is in the visual tree
-        if (VideoHost != null)
+        TryGetHandle("Initialized");
+    }
+
+    /// <summary>
+    /// Handle when VideoHost is loaded
+    /// </summary>
+    private void OnVideoHostLoaded(object? sender, RoutedEventArgs e)
+    {
+        TryGetHandle("Loaded");
+    }
+
+    /// <summary>
+    /// Handle when VideoHost is attached to visual tree
+    /// </summary>
+    private void OnVideoHostAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        TryGetHandle("AttachedToVisualTree");
+    }
+
+    /// <summary>
+    /// Try to get the native window handle
+    /// </summary>
+    private void TryGetHandle(string eventName)
+    {
+        if (_handleReady || VideoHost == null)
         {
-            _videoHandle = (VideoHost as IPlatformHandle)?.Handle ?? IntPtr.Zero;
+            return;
+        }
+
+        try
+        {
+            // NativeControlHost has IPlatformHandle property
+            var platformHandle = VideoHost.PlatformHandle;
             
-            if (_videoHandle != IntPtr.Zero)
+            if (platformHandle != null)
             {
-                _logger.LogInfo($"Video handle obtained: {_videoHandle}");
+                _videoHandle = platformHandle.Handle;
+                
+                if (_videoHandle != IntPtr.Zero)
+                {
+                    _handleReady = true;
+                    _logger.LogInfo($"Video handle obtained in {eventName}: {_videoHandle}");
+                    
+                    // If player service already exists, set the handle now
+                    if (_playerService?.MediaPlayer != null)
+                    {
+                        _playerService.MediaPlayer.Hwnd = _videoHandle;
+                        _logger.LogInfo("Handle set on existing MediaPlayer");
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning($"Handle is zero in {eventName}");
+                }
             }
             else
             {
-                _logger.LogError("Failed to get video handle");
+                _logger.LogWarning($"PlatformHandle is null in {eventName}");
             }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error getting handle in {eventName}", ex);
         }
     }
 
@@ -84,18 +141,24 @@ public partial class VideoPlayerControl : UserControl
         {
             _logger.LogInfo("Initializing video player service");
             
+            // Try to get handle if we don't have it yet
+            if (!_handleReady)
+            {
+                TryGetHandle("InitializePlayer");
+            }
+            
             _playerService = new VideoPlayerService();
             _playerService.Initialize();
 
             // Set the window handle if we have it
-            if (_playerService.MediaPlayer != null && _videoHandle != IntPtr.Zero)
+            if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
             {
                 _playerService.MediaPlayer.Hwnd = _videoHandle;
                 _logger.LogInfo($"MediaPlayer.Hwnd set to: {_videoHandle}");
             }
             else
             {
-                _logger.LogWarning($"MediaPlayer: {_playerService.MediaPlayer != null}, Handle: {_videoHandle}");
+                _logger.LogWarning($"Handle not ready - MediaPlayer: {_playerService.MediaPlayer != null}, HandleReady: {_handleReady}, Handle: {_videoHandle}");
             }
 
             // Subscribe to player events
@@ -132,18 +195,21 @@ public partial class VideoPlayerControl : UserControl
                 return;
             }
 
-            // Ensure handle is set before loading media
-            if (_playerService.MediaPlayer != null && _videoHandle != IntPtr.Zero)
+            // Try to get handle if we still don't have it
+            if (!_handleReady)
             {
-                if (_playerService.MediaPlayer.Hwnd != _videoHandle)
-                {
-                    _playerService.MediaPlayer.Hwnd = _videoHandle;
-                    _logger.LogInfo($"Handle set before loading: {_videoHandle}");
-                }
+                TryGetHandle("LoadVideo");
+            }
+
+            // Ensure handle is set before loading media
+            if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
+            {
+                _playerService.MediaPlayer.Hwnd = _videoHandle;
+                _logger.LogInfo($"Handle set before loading: {_videoHandle}");
             }
             else
             {
-                _logger.LogError($"Cannot set handle - MediaPlayer: {_playerService.MediaPlayer != null}, Handle: {_videoHandle}");
+                _logger.LogError($"Cannot set handle - MediaPlayer: {_playerService.MediaPlayer != null}, HandleReady: {_handleReady}, Handle: {_videoHandle}");
             }
 
             // Load the video
@@ -186,18 +252,21 @@ public partial class VideoPlayerControl : UserControl
             return;
         }
 
-        // Verify handle is still set before playing
-        if (_playerService.MediaPlayer != null && _videoHandle != IntPtr.Zero)
+        // Try one more time to get handle if we don't have it
+        if (!_handleReady)
         {
-            if (_playerService.MediaPlayer.Hwnd != _videoHandle)
-            {
-                _playerService.MediaPlayer.Hwnd = _videoHandle;
-                _logger.LogInfo($"Handle reset before playing: {_videoHandle}");
-            }
-            else
-            {
-                _logger.LogInfo($"Handle already set: {_videoHandle}");
-            }
+            TryGetHandle("PlayButton");
+        }
+
+        // Verify handle is set before playing
+        if (_playerService.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
+        {
+            _playerService.MediaPlayer.Hwnd = _videoHandle;
+            _logger.LogInfo($"Handle set before playing: {_videoHandle}");
+        }
+        else
+        {
+            _logger.LogError($"Cannot play - handle not available: HandleReady={_handleReady}, Handle={_videoHandle}");
         }
 
         _logger.LogInfo($"IsPlaying before: {_playerService.IsPlaying}");
@@ -381,7 +450,13 @@ public partial class VideoPlayerControl : UserControl
     {
         base.OnDetachedFromVisualTree(e);
         
-        this.AttachedToVisualTree -= OnAttachedToVisualTree;
+        if (VideoHost != null)
+        {
+            VideoHost.Initialized -= OnVideoHostInitialized;
+            VideoHost.Loaded -= OnVideoHostLoaded;
+            VideoHost.AttachedToVisualTree -= OnVideoHostAttached;
+        }
+        
         _updateTimer?.Stop();
         _updateTimer?.Dispose();
         _playerService?.Dispose();
