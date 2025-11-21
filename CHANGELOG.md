@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0-Phase2-Hotfix1] - 2025-11-21
+
+### Fixed
+- **Fullscreen Video Player Controls Not Visible**
+  - Fixed critical bug where playback controls were not visible in fullscreen mode
+  - Controls were positioned below the video area instead of overlaying the video
+  - Changed PlayerControls positioning from Grid.RowSpan=2 to Grid.RowSpan=1
+  - Controls now correctly overlay the video at the bottom with VerticalAlignment.Bottom
+  - Added proper margin (10px bottom) for visual spacing from screen edge
+  - Controls maintain ZIndex=100 to render above video surface
+
+### Changed
+- **Enhanced Documentation**
+  - Added comprehensive inline comments to VideoPlayerControl.axaml.cs
+  - All fullscreen mode logic now thoroughly documented with implementation details
+  - Added detailed XML comments to XAML file explaining layout structure
+  - Added tooltips to all video player UI elements in XAML
+  - Documented fullscreen mode behavior and control overlay mechanism
+  - All comments positioned above code lines per coding standards
+
+---
+
 ## [1.0.0-Phase2] - 2025-11-20
 
 ### Added

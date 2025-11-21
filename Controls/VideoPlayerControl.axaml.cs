@@ -517,165 +517,216 @@ public partial class VideoPlayerControl : UserControl
     /// <summary>
     /// Enable fullscreen mode with auto-hide controls
     /// </summary>
+    /// <param name="enable">True to enable fullscreen mode, false to disable</param>
     public void EnableFullscreenMode(bool enable)
     {
+        // Update the fullscreen mode flag
         _isInFullscreenMode = enable;
 
         if (enable)
         {
+            // Log the current control bounds for debugging
             _logger.LogInfo($"Enabling fullscreen mode - VideoPlayerControl Bounds: {this.Bounds}");
 
-            // Ensure video container is visible
+            // Ensure video container is visible and properly layered
             if (VideoContainer != null)
             {
+                // Make container visible
                 VideoContainer.IsVisible = true;
+
+                // Set ZIndex to 0 (below controls which will be ZIndex 100)
                 VideoContainer.ZIndex = 0;
 
-                // Force layout update on container
+                // Force Avalonia to recalculate layout
                 VideoContainer.InvalidateMeasure();
                 VideoContainer.InvalidateArrange();
 
+                // Log container state for debugging
                 _logger.LogInfo($"VideoContainer visible: {VideoContainer.IsVisible}, Bounds: {VideoContainer.Bounds}");
             }
 
-            // Ensure VLC host is visible and force layout update
+            // Ensure VLC host is visible and properly configured
             if (_vlcHost != null)
             {
+                // Make VLC host visible
                 _vlcHost.IsVisible = true;
+
+                // Set ZIndex to 0 (below controls)
                 _vlcHost.ZIndex = 0;
 
-                // Force layout update and refresh VLC handle
+                // Force visual refresh and layout recalculation
                 _vlcHost.InvalidateVisual();
                 _vlcHost.InvalidateMeasure();
                 _vlcHost.InvalidateArrange();
 
+                // Log VLC host state for debugging
                 _logger.LogInfo($"VlcHost visible: {_vlcHost.IsVisible}, Bounds: {_vlcHost.Bounds}");
             }
 
-            // Re-set the VLC window handle after layout changes with a slight delay
+            // Re-set the VLC window handle after layout changes
             if (_playerService?.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
             {
+                // Log handle refresh
                 _logger.LogInfo("Re-setting VLC window handle for fullscreen");
 
-                // Update handle immediately
+                // Update handle immediately to ensure VLC renders to correct window
                 _playerService.MediaPlayer.Hwnd = _videoHandle;
 
-                // Schedule another update after layout settles
+                // Schedule another update after layout settles (100ms delay)
                 Task.Delay(100).ContinueWith(_ =>
                 {
+                    // Execute on UI thread
                     Dispatcher.UIThread.Post(() =>
                     {
+                        // Verify everything is still valid before updating
                         if (_playerService?.MediaPlayer != null && _handleReady && _videoHandle != IntPtr.Zero)
                         {
+                            // Log delayed handle refresh
                             _logger.LogInfo("Re-setting VLC window handle after layout settled");
+
+                            // Update handle again after layout has settled
                             _playerService.MediaPlayer.Hwnd = _videoHandle;
                         }
                     });
                 });
             }
 
-            // Move controls to overlay position (Grid.Row=0 with VerticalAlignment=Bottom)
-            // Use negative margin to pull controls up over the video
+            // Configure player controls for fullscreen overlay mode
             if (PlayerControls != null)
             {
+                // Position controls in row 0 (the video display area) instead of row 1
                 PlayerControls.SetValue(Grid.RowProperty, 0);
-                PlayerControls.SetValue(Grid.RowSpanProperty, 2); // Span both rows to be able to position at bottom
+
+                // Span only 1 row (just the video area)
+                PlayerControls.SetValue(Grid.RowSpanProperty, 1);
+
+                // Align controls to bottom of the video area to overlay the video
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
-                PlayerControls.ZIndex = 100; // Ensure controls are above video
 
-                // Make controls semi-transparent for fullscreen
+                // Set high ZIndex to ensure controls render above the video
+                PlayerControls.ZIndex = 100;
+
+                // Add bottom margin for visual spacing from screen edge
+                PlayerControls.Margin = new Avalonia.Thickness(0, 0, 0, 10);
+
+                // Apply semi-transparent dark background for better visibility over video
                 PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.FromArgb(200, 40, 40, 40)); // Semi-transparent dark background
+                    Avalonia.Media.Color.FromArgb(200, 40, 40, 40));
 
+                // Log control configuration for debugging
                 _logger.LogInfo($"PlayerControls configured for fullscreen: Bounds={PlayerControls.Bounds}, " +
                                $"IsVisible={PlayerControls.IsVisible}, ZIndex={PlayerControls.ZIndex}, " +
                                $"GridRow={PlayerControls.GetValue(Grid.RowProperty)}, RowSpan={PlayerControls.GetValue(Grid.RowSpanProperty)}, " +
                                $"VerticalAlignment={PlayerControls.VerticalAlignment}");
             }
 
-            // Initially show controls in fullscreen (they will auto-hide after 3 seconds)
+            // Make controls visible initially (will auto-hide after 3 seconds)
             SetControlsVisibility(true);
 
-            // Force layout update on controls
+            // Force layout update on controls to apply changes immediately
             if (PlayerControls != null)
             {
+                // Trigger measure pass
                 PlayerControls.InvalidateMeasure();
+
+                // Trigger arrange pass
                 PlayerControls.InvalidateArrange();
 
-                // Log after invalidation
+                // Schedule logging after layout completes (100ms delay)
                 Task.Delay(100).ContinueWith(_ =>
                 {
+                    // Execute on UI thread
                     Dispatcher.UIThread.Post(() =>
                     {
+                        // Verify controls still exist
                         if (PlayerControls != null)
                         {
+                            // Log final control state after layout update
                             _logger.LogInfo($"PlayerControls after layout update: Bounds={PlayerControls.Bounds}, IsVisible={PlayerControls.IsVisible}");
                         }
                     });
                 });
             }
 
-            // Ensure the control can capture pointer events by setting a transparent background
+            // Set transparent background to allow this control to capture pointer events
             this.Background = Avalonia.Media.Brushes.Transparent;
 
-            // Add mouse move handler to the entire control
+            // Attach pointer moved handler to the entire control for mouse movement detection
             this.PointerMoved += OnPointerMovedInFullscreen;
 
-            // Add mouse move handler to video container as well (in case native control blocks events)
+            // Also attach handler to video container (native control may block some events)
             if (VideoContainer != null)
             {
                 VideoContainer.PointerMoved += OnPointerMovedInFullscreen;
             }
 
-            // Add mouse enter/leave handlers to controls
+            // Attach pointer enter/exit handlers to pause auto-hide when hovering over controls
             if (PlayerControls != null)
             {
+                // Stop auto-hide timer when mouse enters controls
                 PlayerControls.PointerEntered += OnControlsPointerEntered;
+
+                // Restart auto-hide timer when mouse leaves controls
                 PlayerControls.PointerExited += OnControlsPointerExited;
             }
 
-            // Start the auto-hide timer
+            // Stop any existing timer
             _controlsHideTimer?.Stop();
+
+            // Start the auto-hide timer (3 seconds)
             _controlsHideTimer?.Start();
         }
         else
         {
+            // Log exit from fullscreen mode
             _logger.LogInfo("Disabling fullscreen mode");
 
-            // Restore controls to normal position (Grid.Row=1)
+            // Restore player controls to normal windowed mode configuration
             if (PlayerControls != null)
             {
+                // Move controls back to row 1 (below video area)
                 PlayerControls.SetValue(Grid.RowProperty, 1);
-                PlayerControls.SetValue(Grid.RowSpanProperty, 1); // Reset row span
+
+                // Reset row span to 1
+                PlayerControls.SetValue(Grid.RowSpanProperty, 1);
+
+                // Restore stretch alignment to fill available space
                 PlayerControls.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
+
+                // Reset ZIndex to 0 (normal layering)
                 PlayerControls.ZIndex = 0;
 
-                // Restore normal controls background
+                // Remove margin
+                PlayerControls.Margin = new Avalonia.Thickness(0);
+
+                // Restore normal light gray background
                 PlayerControls.Background = new Avalonia.Media.SolidColorBrush(
-                    Avalonia.Media.Color.FromRgb(240, 240, 240)); // Normal light background
+                    Avalonia.Media.Color.FromRgb(240, 240, 240));
             }
 
-            // Remove handlers when exiting fullscreen
+            // Remove pointer moved handler from control
             this.PointerMoved -= OnPointerMovedInFullscreen;
 
+            // Remove pointer moved handler from video container
             if (VideoContainer != null)
             {
                 VideoContainer.PointerMoved -= OnPointerMovedInFullscreen;
             }
 
+            // Remove pointer enter/exit handlers from controls
             if (PlayerControls != null)
             {
                 PlayerControls.PointerEntered -= OnControlsPointerEntered;
                 PlayerControls.PointerExited -= OnControlsPointerExited;
             }
 
-            // Restore normal background
+            // Remove transparent background
             this.Background = null;
 
-            // Stop the hide timer
+            // Stop the auto-hide timer
             _controlsHideTimer?.Stop();
 
-            // Show controls when exiting fullscreen
+            // Ensure controls are visible when exiting fullscreen
             SetControlsVisibility(true);
         }
     }
